@@ -1,0 +1,103 @@
+<!-- btl/auth_app/views/setup-nickname.html -->
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Thiết lập Nickname</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="auth-container">
+    <form id="setup-form" class="auth-form">
+      <h2>Ảnh đại diện</h2>
+      <img id="preview"
+           src="https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png"
+           width="100"
+           alt="Avatar preview" />
+      <input type="file" id="avatar" accept="image/*" />
+
+      <h2>Chọn nickname</h2>
+      <input type="text" id="nickname" placeholder="Nhập nickname..." maxlength="30" required />
+
+      <button type="submit">Tiếp tục</button>
+    </form>
+  </div>
+
+  <script>
+    const DEFAULT_AVATAR = 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png';
+    const preview = document.getElementById('preview');
+    const avatarInput = document.getElementById('avatar');
+    const nicknameInput = document.getElementById('nickname');
+
+    // Xem trước ảnh
+    avatarInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) {
+        if (file.size > 2 * 1024 * 1024) {
+          alert('Ảnh quá lớn (tối đa 2MB)');
+          avatarInput.value = '';
+          preview.src = DEFAULT_AVATAR;
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => (preview.src = reader.result);
+        reader.readAsDataURL(file);
+      } else {
+        preview.src = DEFAULT_AVATAR;
+      }
+    });
+
+    // Submit form
+    document.getElementById('setup-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const nick = nicknameInput.value.trim();
+      const file = avatarInput.files[0];
+
+      if (!nick) return alert('Vui lòng nhập nickname');
+      if (nick.length < 2 || nick.length > 30) return alert('Nickname phải dài 2–30 ký tự');
+
+      let avatarUrl = DEFAULT_AVATAR;
+
+      // Upload avatar nếu có
+      if (file) {
+        try {
+          const formData = new FormData();
+          formData.append('avatar', file);
+          const res = await fetch('/api/upload/avatar', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+          });
+          if (!res.ok) throw new Error('Upload thất bại');
+          const data = await res.json();
+          if (data.success && data.url) avatarUrl = data.url;
+          else throw new Error(data.error || 'Upload lỗi');
+        } catch (err) {
+          alert('Không thể tải ảnh: ' + err.message);
+          preview.src = DEFAULT_AVATAR;
+          avatarUrl = DEFAULT_AVATAR;
+        }
+      }
+
+      // Gửi nickname và avatar
+      try {
+        const res = await fetch('/api/users/update-nickname', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nickname: nick, avatar: avatarUrl })
+        });
+        if (!res.ok) throw new Error('Cập nhật thất bại');
+        const data = await res.json();
+        if (data.success) {
+          return (window.location.href = '/chat');
+        }
+        throw new Error(data.error || 'Thiết lập thất bại');
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  </script>
+</body>
+</html>
