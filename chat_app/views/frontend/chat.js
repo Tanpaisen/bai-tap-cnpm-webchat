@@ -56,20 +56,20 @@ const inputWrapper = document.getElementById('chat-input-wrapper'),
   profileNickname = document.getElementById('profile-nickname'),
   nicknameInput = document.getElementById('nickname-input'),
   nicknameUpdateBtn = document.getElementById('nickname-update-btn');
-  renderedMessageIds = new Set(),
+renderedMessageIds = new Set(),
 
-/* ================ INITIALIZATION ================ */
-window.addEventListener('DOMContentLoaded', async () => {
-  try {
-    await loadSessionUser();
-    attachUiEvents();
-    // document.querySelector('[data-func="chat"]')?.click();
-    const stored = sessionStorage.getItem('currentChatTo');
-    if (stored) { sessionStorage.removeItem('currentChatTo'); await startChatWith(stored); }
-  } catch (err) {
-    console.error('Init error', err);
-  }
-});
+  /* ================ INITIALIZATION ================ */
+  window.addEventListener('DOMContentLoaded', async () => {
+    try {
+      await loadSessionUser();
+      attachUiEvents();
+      // document.querySelector('[data-func="chat"]')?.click();
+      const stored = sessionStorage.getItem('currentChatTo');
+      if (stored) { sessionStorage.removeItem('currentChatTo'); await startChatWith(stored); }
+    } catch (err) {
+      console.error('Init error', err);
+    }
+  });
 
 /* ================ UI / EVENTS ================ */
 function showSection(id) {
@@ -278,14 +278,39 @@ function attachUiEvents() {
 
   // Update nickname
   nicknameUpdateBtn?.addEventListener('click', async () => {
-    const newNick = nicknameInput.value.trim(); if (!newNick) return alert('Nhập nickname mới');
+    const newNick = nicknameInput?.value?.trim();
+    if (!newNick) return alert('Nhập nickname mới');
+
     try {
-      const res = await fetch('/api/users/update-nickname', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nickname: newNick }), credentials: 'same-origin' });
-      const data = await res.json();
-      if (data.success) { profileNickname.textContent = newNick; alert('Nickname đã cập nhật'); }
-      else alert(data.error || 'Cập nhật thất bại');
-    } catch (err) { console.error(err); alert('Lỗi'); }
+      const res = await fetch('/api/users/update-nickname', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: newNick })
+      });
+
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch (e) { data = { success: res.ok ? true : false, raw: text }; }
+
+      if (!res.ok) {
+        console.error('Nickname API non-200', res.status, data);
+        return alert(data.error || `Lỗi server ${res.status}`);
+      }
+
+      if (data.success) {
+        if (profileNickname) profileNickname.textContent = newNick;
+        alert('Nickname đã cập nhật');
+      } else {
+        console.error('Nickname update failed', data);
+        alert(data.error || 'Cập nhật thất bại');
+      }
+    } catch (err) {
+      console.error('Network or JS error updating nickname', err);
+      alert('Lỗi kết nối hoặc lỗi nội bộ');
+    }
   });
+
 
   // Logout
   logoutBtn?.addEventListener('click', async () => { try { await fetch('/logout', { method: 'POST', credentials: 'same-origin' }); } catch { } location.href = '/login'; });
@@ -516,7 +541,7 @@ async function loadHistory(prepend = false) {
       const isMine = String(sid) === String(MINE_ID);
 
       appendMessage({
-        _id: m._id, 
+        _id: m._id,
         senderAvatar: isMine ? profileAvatar?.src : getAvatar(m.sender),
         senderOnline: m.sender?.online,
         content: m.content,
@@ -635,7 +660,6 @@ async function sendMessage() {
     }
   }
 
-
   const payload = { receiver: currentChatTo, roomId, text, file: fileUrl };
   try {
     const res = await fetch('/api/chat/send', {
@@ -646,7 +670,7 @@ async function sendMessage() {
     if (!res.ok) throw new Error('Save failed');
     const savedMsg = await res.json();
 
-    // Append locally
+    // Append locally (đảm bảo có _id)
     appendMessage({
       _id: savedMsg._id,
       senderAvatar: savedMsg.sender?.avatar || profileAvatar?.src,
@@ -657,14 +681,8 @@ async function sendMessage() {
     }, true);
 
     messagesEl.scrollTop = messagesEl.scrollHeight;
-    socket.emit('sendMessage', { 
-      to: currentChatTo, 
-      roomId, 
-      _id: savedMsg._id,
-      content: savedMsg.content, 
-      file: savedMsg.file, 
-      image: savedMsg.image 
-    });
+
+    // NOTE: không emit socket ở đây nữa (xóa socket.emit)
     if (inputEl) { inputEl.value = ''; inputEl.style.height = 'auto'; inputEl.focus(); }
     if (fileInputEl) fileInputEl.value = '';
   } catch (err) {
@@ -672,6 +690,7 @@ async function sendMessage() {
     alert('Gửi tin nhắn thất bại');
   }
 }
+
 
 /* ================ SOCKET EVENTS ================ */
 socket.on('connect', () => {

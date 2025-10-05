@@ -25,6 +25,7 @@ exports.getProfile = async (req, res) => {
 };
 
 // Cập nhật nickname và avatar (sau khi đăng nhập lần đầu)
+// controllers/userControllers.js
 exports.updateNickname = async (req, res) => {
   try {
     const { nickname, avatar } = req.body;
@@ -32,13 +33,21 @@ exports.updateNickname = async (req, res) => {
       return res.status(400).json({ error: 'Nickname không hợp lệ' });
     }
 
+    // Chọn userId: ưu tiên tempUserId (khi setup lần đầu), ngược lại dùng session.user._id
+    const userId = req.session?.tempUserId || req.session?.user?._id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     const avatarUrl = avatar?.startsWith('/uploads/avatars/')
       ? avatar
-      : 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png';
+      : undefined; // nếu không truyền avatar thì không cập nhật avatar
 
+    const update = { nickname: nickname.trim() };
+    if (avatarUrl) update.avatar = avatarUrl;
+
+    // Chỉ cập nhật các trường trong `update` (không chạm username)
     const updatedUser = await User.findByIdAndUpdate(
-      req.session.tempUserId,
-      { nickname, avatar: avatarUrl },
+      userId,
+      update,
       { new: true }
     );
 
@@ -46,19 +55,22 @@ exports.updateNickname = async (req, res) => {
       return res.status(404).json({ error: 'Không tìm thấy người dùng để cập nhật' });
     }
 
-    req.session.user = {
-      _id: updatedUser._id,
-      nickname: updatedUser.nickname,
-      avatar: updatedUser.avatar
-    };
+    // Cập nhật session.user: chỉ overwrite nickname và avatar, giữ nguyên username và các trường khác
+    if (!req.session.user) req.session.user = {};
+    req.session.user._id = updatedUser._id;
+    req.session.user.nickname = updatedUser.nickname;
+    req.session.user.avatar = updatedUser.avatar;
 
-    delete req.session.tempUserId;
-    res.json({ success: true });
+    // Nếu dùng tempUserId (flow setup), xóa tempUserId
+    if (req.session?.tempUserId) delete req.session.tempUserId;
+
+    return res.json({ success: true, nickname: updatedUser.nickname, avatar: updatedUser.avatar });
   } catch (err) {
     console.error('Lỗi updateNickname:', err);
-    res.status(500).json({ error: 'Lỗi server' });
+    return res.status(500).json({ error: 'Lỗi server' });
   }
 };
+
 
 // Cập nhật avatar riêng (nếu cần)
 exports.updateAvatar = async (req, res) => {
