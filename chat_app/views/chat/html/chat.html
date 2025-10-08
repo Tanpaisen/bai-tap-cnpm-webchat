@@ -20,9 +20,9 @@
       </div>
       <div class="menu-buttons">
         <button data-func="chat"><i class="fa-solid fa-comments"></i></button>
-        <button data-func="friends" id="btn-friends"><i class="fa-solid fa-user-group"></i></button>
+        <button data-func="friends" id="btn-friends"><i class="fa-solid fa-users-rectangle"></i></button>
         <button data-func="groups"><i class="fa-solid fa-layer-group"></i></button>
-        <button data-func="profile"><i class="fa-solid fa-user"></i></button>
+        <button data-func="profile"><i class="fa-solid fa-circle-user"></i></button>
         <button id="logout-btn"><i class="fa-solid fa-right-from-bracket"></i></button>
       </div>
     </nav>
@@ -47,16 +47,6 @@
       </div>
 
     </aside>
-    <aside id="chat-profile" class="chat-profile">
-      <button id="close-profile-btn" class="close-profile-btn" title="Đóng hồ sơ">×</button>
-      <div class="profile-box">
-        <img id="profile-avatar-preview" class="profile-avatar" />
-        <h3 id="profile-name">Tên người dùng</h3>
-        <button class="profile-action">📞 Gọi điện</button>
-        <button class="profile-action">❌ Xóa bạn</button>
-        <button class="profile-action">⋯ Tùy chọn khác</button>
-      </div>
-    </aside>
 
 
     <!-- Cột 3: nội dung -->
@@ -70,19 +60,29 @@
 
 
       <section id="section-chat">
-        <div id="chat-header" class="chat-header">
+        <div class="chat-header">
+          <button id="back-btn" class="back-btn"><i class="fa-solid fa-arrow-left" style="color: #63E6BE;"></i></button>
+          <span id="chat-name" class="chat-name">Chọn bạn để chat</span>
           <img id="chat-avatar" class="chat-avatar" />
-          <span id="chat-name">Chọn bạn để chat</span>
-          <button id="video-call-btn" class="video-call-btn" title="Gọi video">
-            <i class="fa-solid fa-video"></i>
-          </button>
         </div>
 
-
-        <div id="typing-indicator" style="display:none;"><span class="dot"></span><span class="dot"></span><span
-            class="dot"></span></div>
         <div class="chat-page">
-          <div id="messages" class="messages"></div>
+          <div id="messages" class="messages">
+            <div id="typing-indicator-container" style="display: none;">
+              <div class="incoming message">
+                <div class="avatar-wrapper">
+                  <img src="" class="avatar-sm">
+                </div>
+                <div class="message-content">
+                  <div id="typing-indicator" class="typing-bubble">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div id="chat-input-wrapper" style="display:none;">
             <div class="chat-input">
               <div class="input-toolbar">
@@ -117,6 +117,19 @@
         <input type="text" id="nickname-input" placeholder="Nhập nickname mới" />
         <button id="nickname-update-btn">Lưu nickname</button>
       </section>
+
+      <aside id="chat-profile" class="chat-profile">
+        <button id="close-profile-btn" class="close-profile-btn" title="Đóng hồ sơ">×</button>
+        <div class="profile-box">
+          <img id="profile-avatar-preview" class="profile-avatar" />
+          <h3 id="profile-name">Tên người dùng</h3>
+          <div id="profile-actions" class="profile-actions-wrapper">
+            <button class="profile-action">📞 Gọi điện</button>
+            <button class="profile-action">❌ Xóa bạn</button>
+            <button class="profile-action">⋯ Tùy chọn khác</button>
+          </div>
+        </div>
+      </aside>
     </main>
   </div>
 

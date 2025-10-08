@@ -5,18 +5,20 @@ const bcrypt = require('bcrypt');
 // Lấy thông tin người dùng hiện tại
 exports.getProfile = async (req, res) => {
   try {
-    if (!req.session?.user?._id) {
+    const userId = req.session?.user?._id;
+    if (!userId) {
       return res.status(401).json({ error: 'Chưa đăng nhập' });
     }
 
-    const user = await User.findById(req.session.user._id);
+    const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: 'Không tìm thấy người dùng' });
 
     res.json({
       _id:      user._id,
       username: user.username,
       nickname: user.nickname,
-      avatar:   user.avatar
+      avatar:   user.avatar,
+      online: user.online || false 
     });
   } catch (err) {
     console.error('Lỗi getProfile:', err);
@@ -133,3 +135,136 @@ exports.updatePassword = async (req, res) => {
   }
 };
 
+// //controllers/userControllers.js
+// const User   = require('../models/User');
+// const bcrypt = require('bcrypt');
+// const mongoose = require('mongoose');
+
+// // Lấy thông tin người dùng hiện tại
+// exports.getProfile = async (req, res) => {
+//   const userId = req.session?.user?._id;
+//   console.log('Session userId:', userId);
+
+//   if (!userId) return res.status(401).json({ success: false, message: 'Chưa đăng nhập' });
+
+//   // Kiểm tra ObjectId hợp lệ
+//   if (!mongoose.Types.ObjectId.isValid(userId)) {
+//     return res.status(400).json({ success: false, message: 'userId không hợp lệ' });
+//   }
+
+//   try {
+//     const user = await User.findById(userId).select('-password');
+//     if (!user) return res.status(404).json({ success: false, message: 'User không tồn tại' });
+
+//     res.json({
+//       success: true,
+//       _id: user._id,
+//       username: user.username,
+//       nickname: user.nickname,
+//       avatar: user.avatar
+//     });
+//   } catch (err) {
+//     console.error('getProfile error:', err);
+//     res.status(500).json({ success: false, message: 'Lỗi server' });
+//   }
+// };
+
+
+// // Cập nhật nickname và avatar (sau khi đăng nhập lần đầu)
+// // controllers/userControllers.js
+// exports.updateNickname = async (req, res) => {
+//   try {
+//     const { nickname, avatar } = req.body;
+//     if (!nickname || nickname.trim() === '') {
+//       return res.status(400).json({ error: 'Nickname không hợp lệ' });
+//     }
+
+//     // Chọn userId: ưu tiên tempUserId (khi setup lần đầu), ngược lại dùng session.user._id
+//     const userId = req.session?.tempUserId || req.session?.user?._id;
+//     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+//     const avatarUrl = avatar?.startsWith('/uploads/avatars/')
+//       ? avatar
+//       : undefined; // nếu không truyền avatar thì không cập nhật avatar
+
+//     const update = { nickname: nickname.trim() };
+//     if (avatarUrl) update.avatar = avatarUrl;
+
+//     // Chỉ cập nhật các trường trong `update` (không chạm username)
+//     const updatedUser = await User.findByIdAndUpdate(
+//       userId,
+//       update,
+//       { new: true }
+//     );
+
+//     if (!updatedUser) {
+//       return res.status(404).json({ error: 'Không tìm thấy người dùng để cập nhật' });
+//     }
+
+//     // Cập nhật session.user: chỉ overwrite nickname và avatar, giữ nguyên username và các trường khác
+//     if (!req.session.user) req.session.user = {};
+//     req.session.user._id = updatedUser._id;
+//     req.session.user.nickname = updatedUser.nickname;
+//     req.session.user.avatar = updatedUser.avatar;
+
+//     // Nếu dùng tempUserId (flow setup), xóa tempUserId
+//     if (req.session?.tempUserId) delete req.session.tempUserId;
+
+//     return res.json({ success: true, nickname: updatedUser.nickname, avatar: updatedUser.avatar });
+//   } catch (err) {
+//     console.error('Lỗi updateNickname:', err);
+//     return res.status(500).json({ error: 'Lỗi server' });
+//   }
+// };
+
+
+// // Cập nhật avatar riêng (nếu cần)
+// exports.updateAvatar = async (req, res) => {
+//   // 🚨 BỔ SUNG KIỂM TRA SESSION TRƯỚC KHỐI TRY
+//   if (!req.session?.user?._id) {
+//     return res.status(401).json({ error: 'Unauthorized or Session expired' });
+//   }
+//   
+//   try {
+//     if (!req.file) {
+//       // ...
+//     }
+
+//     // Code truy cập req.session.user._id giờ đã an toàn
+//     const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+//     const user = await User.findByIdAndUpdate(
+//       req.session.user._id, 
+//       { avatar: avatarUrl },
+//       { new: true }
+//     );
+
+//     // ...
+//   } catch (err) {
+//     console.error('❌ Lỗi updateAvatar:', err);
+//     res.status(500).json({ error: 'Lỗi server' });
+//   }
+// };
+
+
+// exports.updatePassword = async (req, res) => {
+//   // 🚨 BỔ SUNG KIỂM TRA SESSION TRƯỚC KHỐI TRY
+//   if (!req.session?.user?._id) {
+//     return res.status(401).json({ error: 'Unauthorized or Session expired' });
+//   }
+
+//   try {
+//     const { oldPassword, newPassword, confirmPassword } = req.body;
+
+//     // ... logic validation
+
+//     // Tải bản ghi có hash mật khẩu (giờ đã an toàn)
+//     const user = await User.findById(req.session.user._id).select('+password');
+//     if (!user) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+    
+//     // ... logic còn lại
+    
+//   } catch (err) {
+//     console.error('❌ updatePassword error:', err);
+//     res.status(500).json({ error: 'Lỗi server khi cập nhật mật khẩu' });
+//   }
+// };

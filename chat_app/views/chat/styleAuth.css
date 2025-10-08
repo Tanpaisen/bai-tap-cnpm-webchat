@@ -1,0 +1,103 @@
+
+.container {
+  max-width: 400px;
+  width:100%;
+  text-align: center;
+  margin-left: 60px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 40px;
+  backdrop-filter:blur(6px);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.form-box h2 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
+
+.form-box {
+  background: transparent;                            /* ✅ hoàn toàn trong suốt */
+  backdrop-filter: none;                              /* ❌ không làm mờ nền */
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.6);          /* viền trắng rõ */
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);          /* bóng đổ để nổi lên */
+  padding: 30px;
+  max-width: 400px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+
+form input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 16px;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+form button {
+  width: 100%;
+  padding: 12px;
+  background-color: #f4b400;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  color: white;
+  cursor: pointer;
+  box-shadow:inset 0 4px 12px rgba(0,0,0,0.1);
+  transition: background 0.3s ease;
+}
+
+form button:hover {
+  background-color: #e09e00;
+}
+
+.links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.links a {
+  color: #0077cc;
+  text-decoration: none;
+}
+
+.social-icons {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.social-icons span {
+  font-size: 24px;
+  margin: 0 6px;
+  cursor: pointer;
+}
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: url('https://images.hdqwalls.com/download/twilight-sea-stars-dusk-dawn-dark-sunset-82-2560x1440.jpg') no-repeat center center fixed;
+  background-size: cover;
+  display: flex;
+  justify-content: center;
+  align-items: center;          
+  height: 100vh;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.3); /* hoặc rgba(0,0,0,0.2) nếu cần tối */
+  z-index: -1;
+}

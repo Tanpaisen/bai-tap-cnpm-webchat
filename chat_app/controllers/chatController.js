@@ -7,6 +7,8 @@ async function getHistory(req, res) {
     const { user1, user2, limit = 50, skip = 0 } = req.query;
     const sessionUser = req.session?.user?._id;
 
+    const sessionUserIdStr = sessionUser ? sessionUser.toString() : null;
+
     if (!user1 || !user2) {
       return res.status(400).json({ error: 'Thiếu user1 hoặc user2' });
     }

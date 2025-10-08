@@ -4,6 +4,8 @@ const path          = require('path');
 const cookieParser  = require('cookie-parser');
 const session       = require('express-session');
 const MongoStore    = require('connect-mongo');
+require('dotenv').config();
+
 
 // import routes & middleware
 const authRoutes    = require('../auth_app/routes/auth');
@@ -25,16 +27,24 @@ app.use(cookieParser());
 
 // 3. Session (MongoDB-backed)
 const sessionMiddleware = session({
-  secret: 'secret-key',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({
-    mongoUrl: 'mongodb://tancan7:taaiv007@127.0.0.1:27017/authDB?authSource=authDB'
+    mongoUrl: process.env.MONGO_URI
   }),
   cookie: { maxAge: 1000 * 60 * 60 * 24 }
 });
 
+
 app.use(sessionMiddleware);
+
+const cors = require('cors');
+app.use(cors({
+  origin: 'http://localhost:3000', 
+  credentials: true
+}));
+
 
 // 6. Disable cache for all /api
 app.use('/api', (req, res, next) => {
@@ -48,8 +58,7 @@ app.use('/api', (req, res, next) => {
 app.get('/chat', ensureLoggedIn, (req, res) => {
   const user = req.session.user;
   if (!user?.nickname?.trim()) {
-    req.session.tempUserId = user._id;
-    delete req.session.user;
+    req.session.tempUserId = user._id.toString();
     return res.redirect('/setup-nickname');
   }
   res.sendFile(

@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <title>Thiết lập Nickname</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="/chat/style.css" />
 </head>
 <body>
   <div class="auth-container">
@@ -67,7 +67,7 @@
           const res = await fetch('/api/upload/avatar', {
             method: 'POST',
             body: formData,
-            credentials: 'same-origin'
+            credentials: 'include'
           });
           if (!res.ok) throw new Error('Upload thất bại');
           const data = await res.json();
@@ -84,7 +84,7 @@
       try {
         const res = await fetch('/api/users/update-nickname', {
           method: 'POST',
-          credentials: 'same-origin',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nickname: nick, avatar: avatarUrl })
         });

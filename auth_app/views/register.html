@@ -3,18 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <title>Đăng ký</title>
-  <link rel="stylesheet" href="/auth/style.css" />
+  <link rel="stylesheet" href="/chat/styleAuth.css" />
 </head>
 <body>
   <div class="auth-container">
+        <div class="form-box">
+      <h2>ĐĂNG KÍ TÀI KHOẢN</h2>
     <form action="/register" method="POST" class="auth-form">
-      <h2>Đăng ký</h2>
       <input type="text"  name="username"        placeholder="Tên đăng nhập"    required />
       <input type="password" name="password"       placeholder="Mật khẩu"          required />
       <input type="password" name="confirmPassword" placeholder="Xác nhận mật khẩu" required />
       <button type="submit">Tạo tài khoản</button>
       <p>Đã có tài khoản? <a href="/login">Đăng nhập</a></p>
     </form>
+  </div>
   </div>
 </body>
 </html>

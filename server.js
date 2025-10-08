@@ -1,6 +1,6 @@
 //btl/server.js
-const http       = require('http');
-const mongoose   = require('mongoose');
+const http = require('http');
+const mongoose = require('mongoose');
 const { Server } = require('socket.io');
 const { app, sessionMiddleware } = require('./app/app');
 const chatController = require('./chat_app/controllers/chatController');
@@ -11,7 +11,9 @@ const io = new Server(server, {
   cors: {
     origin: 'http://localhost:3000',
     credentials: true
-  }
+  },
+  pingInterval: 25000,
+  pingTimeout: 60000,
 });
 
 app.set('io', io);
@@ -29,10 +31,12 @@ io.on('connection', socket => {
     return socket.disconnect();
   }
 
-  const userId   = sess._id.toString();
-  const avatar   = sess.avatar;
+  const userId = sess._id.toString();
+  const avatar = sess.avatar;
   const nickname = sess.nickname || 'Ẩn danh';
-  console.log(`🟢 ${nickname} connected: ${socket.id}`);
+
+  socket.userId = userId;
+  socket.avatar = avatar;
 
   // Cập nhật trạng thái online
   User.findByIdAndUpdate(userId, { online: true }).catch(console.error);
@@ -43,37 +47,50 @@ io.on('connection', socket => {
     socket.join(roomId);
     console.log(`${nickname} joined room ${roomId}`);
 
-    // Nếu muốn gửi lịch sử:
-    // const msgs = await chatController.getMessages(roomId);
-    // socket.emit('history', msgs);
+    /// ==========================================
+    // [THÊM MỚI] Xử lý Typing Indicator
+    // ========================================
+    socket.on('typing', data => {
+      if (!data.roomId) return;
+
+      // ✅ 1. SỬ DỤNG PAYLOAD VÀ GÁN ID/AVATAR
+      const payload = {
+        roomId: data.roomId,
+        from: socket.userId,
+        senderAvatar: socket.avatar,
+        // Bạn có thể thêm cả nickname nếu muốn
+        // senderNickname: socket.nickname
+      };
+      // ✅ 2. Phát sóng đối tượng payload
+      socket.to(data.roomId).emit('typing', payload);
+    });
+
+    socket.on('stopTyping', data => {
+      if (!data.roomId) return;
+
+      // ✅ SỬA LỖI: Tạo payload để gửi ID người gửi
+      const payload = {
+        roomId: data.roomId,
+        from: socket.userId // Vẫn nên truyền 'from' để client biết ai đang dừng gõ (nếu cần)
+      };
+
+      // Phát sóng TỚI TẤT CẢ mọi người TRONG PHÒNG, TRỪ chính người gửi
+      socket.to(data.roomId).emit('stopTyping', payload);
+    });
+
   });
 
+
   // Nhận tin nhắn
-  socket.on('sendMessage', async payload => {
-    const { to, roomId, content, file, image } = payload;
-    if (!to || !roomId || (!content && !file && !image)) {
-      return console.warn('Invalid sendMessage payload', payload);
+  socket.on('newMessage', fullMsg => {
+    // fullMsg là tin nhắn đã được lưu vào DB và gửi từ Client
+    if (!fullMsg || !fullMsg.roomId || !fullMsg.sender) {
+      return console.warn('Invalid newMessage broadcast payload. Missing roomId or sender.');
     }
 
-    try {//lưu tin vào mongo
-      const msgDoc = await chatController.saveMessage({
-        sender: userId,
-        receiver: to,
-        room: roomId,
-        content,
-        file,
-        image
-      });
-
-      await msgDoc.populate('sender', '_id avatar nickname online');
-      const fullMsg = msgDoc.toObject();
-
-      //tất cả thành viên trong room
-      io.in(roomId).emit('newMessage', fullMsg);
-      console.log('📤 newMessage broadcasted:', fullMsg);
-    } catch (err) {
-      console.error('saveMessage error:', err);
-    }
+    // Phát sóng đến TẤT CẢ client TRONG PHÒNG, TRỪ CHÍNH NGƯỜI GỬI (socket.to)
+    socket.to(fullMsg.roomId).emit('newMessage', fullMsg);
+    console.log(`📤 [Broadcast] Tin nhắn mới đã được phát sóng tới phòng ${fullMsg.roomId}`);
   });
 
   // Disconnect
@@ -81,13 +98,15 @@ io.on('connection', socket => {
     console.log(`🔴 ${nickname} disconnected`);
     User.findByIdAndUpdate(userId, { online: false }).catch(console.error);
   });
+
 });
 
 // 🚀 Kết nối Mongo và khởi động server
+
 mongoose
-  .connect('mongodb://tancan7:taaiv007@127.0.0.1:27017/authDB?authSource=authDB')
+  .connect(process.env.MONGO_URI)
   .then(() => {
-    console.log('✅ MongoDB connected');
+    console.log('✅ MongoDB Atlas connected');
     const PORT = process.env.PORT || 3000;
     server.listen(PORT, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);

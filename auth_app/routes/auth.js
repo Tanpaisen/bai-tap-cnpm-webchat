@@ -1,8 +1,8 @@
 //btl/routes/auth.js
 const express = require('express');
-const path    = require('path');
-const router  = express.Router();
-const User    = require('../../chat_app/models/User');
+const path = require('path');
+const router = express.Router();
+const User = require('../../chat_app/models/User');
 
 // Serve trang đăng ký
 router.get('/register', (req, res) => {
@@ -53,16 +53,18 @@ router.post('/login', async (req, res) => {
 
     // ✅ Nếu chưa có nickname → chuyển sang setup
     if (!user.nickname?.trim()) {
-      req.session.tempUserId = user._id;
-      delete req.session.user;
+      req.session.user = { _id: user._id.toString() };
+
+      req.session.tempUserId = user._id.toString();
+
       return res.redirect('/setup-nickname');
     }
 
     // ✅ Nếu đã có nickname → vào chat
     req.session.user = {
-      _id:      user._id,
+      _id: user._id.toString(),
       nickname: user.nickname,
-      avatar:   user.avatar
+      avatar: user.avatar
     };
     return res.redirect('/chat');
   } catch (err) {
