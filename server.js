@@ -1,117 +1,115 @@
-//btl/server.js
+// btl/server.js
 const http = require('http');
 const mongoose = require('mongoose');
-const { Server } = require('socket.io');
+// const { Server } = require('socket.io'); // ❌ XÓA DÒNG NÀY
 const { app, sessionMiddleware } = require('./app/app');
-const chatController = require('./chat_app/controllers/chatController');
 const User = require('./chat_app/models/User');
+const socketManager = require('./chat_app/socket/socketManager'); // ✅ IMPORT MỚI
 
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: 'http://localhost:3000',
-    credentials: true
-  },
-  pingInterval: 25000,
-  pingTimeout: 60000,
+
+// ⚙️ Cho phép cả localhost và DevTunnel
+const allowedOrigins = [
+    'http://localhost:3000',
+    'https://n7421zlm-3000.asse.devtunnels.ms'
+];
+
+// ✅ Khởi tạo IO bằng socketManager
+const io = socketManager.init(server, { 
+    cors: {
+        origin: allowedOrigins,
+        credentials: true
+    },
+    pingInterval: 25000,
+    pingTimeout: 60000
 });
 
+// Gắn socket.io vào app để có thể emit từ controller (Giữ nguyên)
 app.set('io', io);
 
-// 🔗 Share session giữa Express & Socket.IO
+// 🧩 Dùng chung session giữa Express & Socket.IO
 io.use((socket, next) => {
-  sessionMiddleware(socket.request, {}, next);
+    sessionMiddleware(socket.request, {}, next);
 });
 
-// 🧠 Socket.IO logic
+// 🧠 Logic Socket.IO
 io.on('connection', socket => {
-  const sess = socket.request.session?.user;
-  if (!sess) {
-    socket.emit('unauthorized');
-    return socket.disconnect();
-  }
-
-  const userId = sess._id.toString();
-  const avatar = sess.avatar;
-  const nickname = sess.nickname || 'Ẩn danh';
-
-  socket.userId = userId;
-  socket.avatar = avatar;
-
-  // Cập nhật trạng thái online
-  User.findByIdAndUpdate(userId, { online: true }).catch(console.error);
-
-  // Join room
-  socket.on('joinRoom', async roomId => {
-    if (!roomId) return;
-    socket.join(roomId);
-    console.log(`${nickname} joined room ${roomId}`);
-
-    /// ==========================================
-    // [THÊM MỚI] Xử lý Typing Indicator
-    // ========================================
-    socket.on('typing', data => {
-      if (!data.roomId) return;
-
-      // ✅ 1. SỬ DỤNG PAYLOAD VÀ GÁN ID/AVATAR
-      const payload = {
-        roomId: data.roomId,
-        from: socket.userId,
-        senderAvatar: socket.avatar,
-        // Bạn có thể thêm cả nickname nếu muốn
-        // senderNickname: socket.nickname
-      };
-      // ✅ 2. Phát sóng đối tượng payload
-      socket.to(data.roomId).emit('typing', payload);
-    });
-
-    socket.on('stopTyping', data => {
-      if (!data.roomId) return;
-
-      // ✅ SỬA LỖI: Tạo payload để gửi ID người gửi
-      const payload = {
-        roomId: data.roomId,
-        from: socket.userId // Vẫn nên truyền 'from' để client biết ai đang dừng gõ (nếu cần)
-      };
-
-      // Phát sóng TỚI TẤT CẢ mọi người TRONG PHÒNG, TRỪ chính người gửi
-      socket.to(data.roomId).emit('stopTyping', payload);
-    });
-
-  });
-
-
-  // Nhận tin nhắn
-  socket.on('newMessage', fullMsg => {
-    // fullMsg là tin nhắn đã được lưu vào DB và gửi từ Client
-    if (!fullMsg || !fullMsg.roomId || !fullMsg.sender) {
-      return console.warn('Invalid newMessage broadcast payload. Missing roomId or sender.');
+    const sess = socket.request.session?.user;
+    if (!sess) {
+        socket.emit('unauthorized');
+        return socket.disconnect();
     }
 
-    // Phát sóng đến TẤT CẢ client TRONG PHÒNG, TRỪ CHÍNH NGƯỜI GỬI (socket.to)
-    socket.to(fullMsg.roomId).emit('newMessage', fullMsg);
-    console.log(`📤 [Broadcast] Tin nhắn mới đã được phát sóng tới phòng ${fullMsg.roomId}`);
-  });
+    const userId = sess._id.toString();
+    const avatar = sess.avatar;
+    const nickname = sess.nickname || 'Ẩn danh';
 
-  // Disconnect
-  socket.on('disconnect', () => {
-    console.log(`🔴 ${nickname} disconnected`);
-    User.findByIdAndUpdate(userId, { online: false }).catch(console.error);
-  });
+    socket.userId = userId;
+    socket.avatar = avatar;
+    socket.nickname = nickname;
 
+    // ✅ GHI NHẬN USER ONLINE VÀO MANAGER
+    socketManager.addOnlineUser(userId, socket.id); 
+
+    // Đánh dấu online trong DB
+    User.findByIdAndUpdate(userId, { online: true }).catch(console.error);
+
+    // Gắn listener typing một lần duy nhất
+    socket.on('typing', () => {
+        if (!socket.currentRoomId) return;
+        socket.to(socket.currentRoomId).emit('typing', {
+            roomId: socket.currentRoomId,
+            from: socket.userId,
+            senderAvatar: socket.avatar,
+            senderNickname: socket.nickname
+        });
+    });
+
+    socket.on('stopTyping', () => {
+        if (!socket.currentRoomId) return;
+        socket.to(socket.currentRoomId).emit('stopTyping', {
+            roomId: socket.currentRoomId,
+            from: socket.userId
+        });
+    });
+
+    // Người dùng join room
+    socket.on('joinRoom', async roomId => {
+        if (!roomId) return;
+        socket.join(roomId);
+        socket.currentRoomId = roomId;
+        console.log(`✅ ${nickname} joined room ${roomId}`);
+    });
+
+    socket.on('newMessage', fullMsg => {
+        if (!fullMsg || !fullMsg.roomId || !fullMsg.sender) {
+            return console.warn('⚠️ Invalid message payload.');
+        }
+        socket.to(fullMsg.roomId).emit('newMessage', fullMsg);
+        console.log(`📩 Broadcast message to room ${fullMsg.roomId}`);
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`🔴 ${nickname} disconnected`);
+        // ✅ XÓA USER KHỎI MANAGER KHI DISCONNECT
+        socketManager.removeOnlineUser(userId); 
+
+        // Đánh dấu offline trong DB
+        User.findByIdAndUpdate(userId, { online: false }).catch(console.error);
+    });
 });
 
-// 🚀 Kết nối Mongo và khởi động server
-
+// 🚀 Kết nối MongoDB và khởi động server
 mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log('✅ MongoDB Atlas connected');
-    const PORT = process.env.PORT || 3000;
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running at http://localhost:${PORT}`);
+    .connect(process.env.MONGO_URI)
+    .then(() => {
+        console.log('✅ MongoDB Atlas connected');
+        const PORT = process.env.PORT || 3000;
+        server.listen(PORT, () => {
+            console.log(`🚀 Server running at: http://localhost:${PORT}`);
+            console.log(`🌐 Tunnel: https://n7421zlm-3000.asse.devtunnels.ms`);
+        });
+    })
+    .catch(err => {
+        console.error('❌ MongoDB connection error:', err);
     });
-  })
-  .catch(err => {
-    console.error('❌ MongoDB connection error:', err);
-  });

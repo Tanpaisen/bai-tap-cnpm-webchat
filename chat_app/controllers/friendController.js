@@ -2,367 +2,234 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const FriendRequest = require('../models/FriendRequest');
 
-async function listFriends(req, res) {
-  try {
-    const userId = req.session?.user?._id;
-    if (!userId || !mongoose.isValidObjectId(userId)) {
-      return res.status(401).json({ error: 'Chưa đăng nhập hoặc ID không hợp lệ' });
-    }
+const friendController = {
+  // 1. Lấy danh sách bạn bè
+  listFriends: async (req, res) => {
+    try {
+      const userId = req.session?.user?._id;
+      if (!userId || !mongoose.isValidObjectId(userId)) {
+        return res.status(401).json({ error: 'Chưa đăng nhập hoặc ID không hợp lệ' });
+      }
 
-    const me = await User.findById(userId)
-      .populate({ path: 'friends', select: '_id nickname avatar' })
-      .lean();
+      const me = await User.findById(userId)
+        .populate({ path: 'friends', select: '_id nickname avatar online' })
+        .lean();
 
-    if (!me) return res.status(404).json({ error: 'User không tồn tại' });
+      if (!me) return res.status(404).json({ error: 'User không tồn tại' });
 
-    // 🔧 Loại bỏ trùng lặp
-    const uniqueFriends = [
-      ...new Map((me.friends || []).map(u => [u._id.toString(), u])).values()
-    ];
+      // Lọc bỏ giá trị null và trùng lặp
+      const validFriends = (me.friends || []).filter(f => f && f._id);
+      const uniqueFriends = [
+        ...new Map(validFriends.map(u => [u._id.toString(), u])).values()
+      ];
 
-    const friends = uniqueFriends.map(u => ({
-      id: u._id,
-      nickname: u.nickname,
-      avatar: u.avatar || 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png'
-    }));
-
-    res.json(friends);
-  } catch (err) {
-    console.error('❌ Lỗi listFriends:', err);
-    res.status(500).json({ error: 'Server error', detail: err.message });
-  }
-}
-
-async function listAllUsers(req, res) {
-  try {
-    const meId = req.session?.user?._id;
-    if (!meId || !mongoose.isValidObjectId(meId)) {
-      return res.status(401).json({ error: 'Chưa đăng nhập hoặc ID không hợp lệ' });
-    }
-
-    const me = await User.findById(meId).lean();
-    const myFriends = me?.friends || [];
-
-    const allUsers = await User.find({ _id: { $ne: meId } })
-      .select('_id nickname avatar')
-      .lean();
-
-    const requests = await FriendRequest.find({
-      $or: [{ from: meId }, { to: meId }]
-    }).select('from to').lean();
-
-    const result = allUsers.map(u => {
-      let status = 'none';
-      if (myFriends.some(id => id.equals(u._id))) status = 'friend';
-      else if (requests.find(r => r.from.equals(meId) && r.to.equals(u._id))) status = 'pending';
-      else if (requests.find(r => r.to.equals(meId) && r.from.equals(u._id))) status = 'incoming';
-
-      return {
+      const friends = uniqueFriends.map(u => ({
         id: u._id,
-        nickname: u.nickname,
+        _id: u._id,
+        nickname: u.nickname || u.username,
         avatar: u.avatar || 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png',
-        status
-      };
-    });
+        online: u.online || false
+      }));
 
-    res.json(result);
-  } catch (err) {
-    console.error('❌ Lỗi listAllUsers:', err);
-    res.status(500).json({ error: 'Server error', detail: err.message });
-  }
-}
-
-async function sendRequest(req, res) {
-  try {
-    const from = req.session?.user?._id;
-    const { to } = req.body;
-    console.log('DEBUG sendRequest: From ID:', from, 'To ID:', to); 
-
-    if (!from || !to || from === to || !mongoose.isValidObjectId(to)) {
-      return res.status(400).json({ error: 'Yêu cầu không hợp lệ' });
+      res.json(friends);
+    } catch (err) {
+      console.error('❌ Lỗi listFriends:', err);
+      res.status(500).json({ error: 'Lỗi server' });
     }
+  },
 
-    const alreadyFriend = await User.exists({ _id: from, friends: to });
-    if (alreadyFriend) {
-      return res.status(400).json({ error: 'Hai người đã là bạn bè' });
-    }
+  // 2. Lấy danh sách tất cả user (Gợi ý kết bạn)
+  listAllUsers: async (req, res) => {
+    try {
+      const meId = req.session?.user?._id;
+      if (!meId) return res.status(401).json({ error: 'Chưa đăng nhập' });
 
-    const exists = await FriendRequest.findOne({ from, to });
-    if (exists) return res.json({ success: true });
+      const me = await User.findById(meId).lean();
+      // Chuyển friends ID sang string để so sánh
+      const myFriends = (me?.friends || []).map(id => id.toString());
+      
+      // Loại trừ: chính mình, bạn bè hiện tại, và admin
+      const excludeIds = [meId.toString(), ...myFriends];
 
-    await FriendRequest.create({ from, to });
-    res.json({ success: true });
-  } catch (err) {
-    console.error('❌ Lỗi sendRequest:', err);
-    res.status(500).json({ error: 'Server error', detail: err.message });
-  }
-}
-
-async function listRequests(req, res) {
-  try {
-    const meId = req.session?.user?._id;
-    if (!meId || !mongoose.isValidObjectId(meId)) {
-      return res.status(401).json({ error: 'Chưa đăng nhập hoặc ID không hợp lệ' });
-    }
-
-    const arr = await FriendRequest.find({ to: meId })
-      .populate('from', '_id nickname avatar')
+      const allUsers = await User.find({ 
+          _id: { $nin: excludeIds }, 
+          role: { $ne: 'admin' } 
+      })
+      .select('_id nickname avatar username')
+      .limit(50)
       .lean();
 
-    const result = arr.map(r => ({
-      reqId: r._id,
-      id: r.from._id,
-      nickname: r.from.nickname,
-      avatar: r.from.avatar || 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png'
-    }));
+      // Lấy các request liên quan đến mình (để hiển thị trạng thái)
+      const requests = await FriendRequest.find({
+        $or: [{ from: meId }, { to: meId }]
+      }).select('from to').lean();
 
-    res.json(result);
-  } catch (err) {
-    console.error('❌ Lỗi listRequests:', err);
-    res.status(500).json({ error: 'Server error', detail: err.message });
-  }
-}
+      const result = allUsers.map(u => {
+        const uIdStr = u._id.toString();
+        let status = 'none';
+        let reqId = null;
 
-async function respondRequest(req, res) {
-  try {
-    const meId = req.session?.user?._id;
-    const { requestId, action } = req.body;
+        // Kiểm tra xem có request nào giữa 2 người không
+        // Thêm check null an toàn cho r.from và r.to
+        const req = requests.find(r => {
+            if (!r || !r.from || !r.to) return false; 
+            return (r.from.toString() === meId && r.to.toString() === uIdStr) || 
+                   (r.to.toString() === meId && r.from.toString() === uIdStr);
+        });
 
-    if (!meId || !requestId || !['accept', 'reject'].includes(action) || !mongoose.isValidObjectId(requestId)) {
-      return res.status(400).json({ error: 'Dữ liệu không hợp lệ' });
+        if (req) {
+            if (req.from.toString() === meId) status = 'pending'; // Mình đã gửi
+            else { 
+                status = 'incoming'; // Họ gửi cho mình
+                reqId = req._id;
+            }
+        }
+
+        return {
+          id: u._id,
+          _id: u._id,
+          nickname: u.nickname || u.username,
+          avatar: u.avatar || 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png',
+          status,
+          reqId
+        };
+      });
+
+      res.json(result);
+    } catch (err) {
+      console.error('❌ Lỗi listAllUsers:', err);
+      res.status(500).json({ error: 'Lỗi server', detail: err.message });
     }
+  },
 
-    const reqDoc = await FriendRequest.findById(requestId);
-    if (!reqDoc) return res.status(404).json({ error: 'Không tìm thấy lời mời' });
+  // 3. Gửi lời mời
+  sendRequest: async (req, res) => {
+    try {
+      const from = req.session?.user?._id;
+      const { to } = req.body;
 
-    if (action === 'accept') {
-      const fromUser = await User.findById(reqDoc.from);
-      const toUser = await User.findById(reqDoc.to);
-      if (!fromUser || !toUser) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+      if (!from || !to || from === to || !mongoose.isValidObjectId(to)) {
+        return res.status(400).json({ error: 'Yêu cầu không hợp lệ' });
+      }
 
-      // ✅ thêm bạn 2 chiều, có kiểm tra trùng
-      if (!fromUser.friends.includes(toUser._id)) fromUser.friends.push(toUser._id);
-      if (!toUser.friends.includes(fromUser._id)) toUser.friends.push(fromUser._id);
-      await fromUser.save();
-      await toUser.save();
+      // Kiểm tra xem đã là bạn chưa
+      const user = await User.findById(from);
+      if (user.friends.includes(to)) {
+        return res.status(400).json({ error: 'Hai người đã là bạn bè' });
+      }
+
+      const exists = await FriendRequest.findOne({
+        $or: [
+          { from: from, to: to },
+          { from: to, to: from } 
+        ]
+      });
+
+      if (exists) {
+        if (exists.to.toString() === from.toString()) {
+          return res.status(400).json({ error: 'Người dùng này đã gửi lời mời cho bạn.' });
+        }
+        return res.json({ success: true, message: 'Đã gửi lại yêu cầu' }); 
+      }
+
+      await FriendRequest.create({ from, to, status: 'pending' });
+      res.json({ success: true, message: 'Gửi lời mời thành công' });
+    } catch (err) {
+      console.error('❌ Lỗi sendRequest:', err);
+      res.status(500).json({ error: 'Server error', detail: err.message });
     }
+  },
 
-    await reqDoc.deleteOne();
-    res.json({ success: true });
-  } catch (err) {
-    console.error('❌ Lỗi respondRequest:', err);
-    res.status(500).json({ error: 'Server error', detail: err.message });
-  }
-}
+  // 4. ✅ Lấy danh sách lời mời đến (Đã FIX lỗi null và crash)
+  listRequests: async (req, res) => {
+    try {
+      const meId = req.session?.user?._id;
+      if (!meId) return res.status(401).json({ error: 'Chưa đăng nhập' });
 
-async function removeFriend(req, res) {
-  try {
-    const meId = req.session?.user?._id;
-    const { targetId } = req.body;
+      // Tìm request gửi TỚI mình
+      const arr = await FriendRequest.find({ to: meId, status: 'pending' })
+        .populate('from', '_id nickname username avatar') 
+        .lean();
 
-    if (!meId || !targetId || !mongoose.isValidObjectId(targetId)) {
-      return res.status(400).json({ error: 'Dữ liệu không hợp lệ' });
+      // 🌟 QUAN TRỌNG: Lọc bỏ các request mà 'from' bị null (người gửi đã bị xóa)
+      // Sử dụng .filter() trước khi .map()
+      const validRequests = arr.filter(r => r && r.from && r.from._id);
+
+      const result = validRequests.map(r => ({
+        reqId: r._id,
+        requestId: r._id,
+        id: r.from._id, 
+        username: r.from.username,
+        nickname: r.from.nickname || r.from.username,
+        avatar: r.from.avatar || 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png',
+        createdAt: r.createdAt
+      }));
+
+      res.json(result);
+    } catch (err) {
+      console.error('❌ Lỗi listRequests:', err);
+      res.status(500).json({ error: 'Server error', detail: err.message });
     }
+  },
 
-    await User.findByIdAndUpdate(meId, { $pull: { friends: targetId } });
-    await User.findByIdAndUpdate(targetId, { $pull: { friends: meId } });
+  // 5. Phản hồi (Accept/Reject)
+  respondRequest: async (req, res) => {
+    try {
+      const meId = req.session?.user?._id;
+      const { requestId, action } = req.body;
 
-    res.json({ success: true });
-  } catch (err) {
-    console.error('❌ Lỗi removeFriend:', err);
-    res.status(500).json({ error: 'Server error', detail: err.message });
+      if (!requestId || !['accept', 'reject'].includes(action)) {
+        return res.status(400).json({ error: 'Dữ liệu không hợp lệ' });
+      }
+
+      const reqDoc = await FriendRequest.findById(requestId);
+      if (!reqDoc) return res.status(404).json({ error: 'Không tìm thấy lời mời' });
+
+      // Chỉ xử lý khi mình là người nhận (to)
+      if (reqDoc.to.toString() !== meId) {
+        return res.status(403).json({ error: 'Bạn không có quyền chấp nhận lời mời này.' });
+      }
+
+      if (action === 'accept') {
+        await User.findByIdAndUpdate(reqDoc.from, { $addToSet: { friends: reqDoc.to } });
+        await User.findByIdAndUpdate(reqDoc.to, { $addToSet: { friends: reqDoc.from } });
+        await FriendRequest.findByIdAndDelete(requestId);
+        res.json({ success: true, message: 'Đã kết bạn' });
+      } else {
+        await FriendRequest.findByIdAndDelete(requestId);
+        res.json({ success: true, message: 'Đã từ chối' });
+      }
+    } catch (err) {
+      console.error('Respond Error:', err);
+      res.status(500).json({ error: 'Lỗi server' });
+    }
+  },
+
+  // 6. Hủy kết bạn
+  removeFriend: async (req, res) => {
+    try {
+      const meId = req.session?.user?._id;
+      const { targetId } = req.body;
+
+      if (!targetId) return res.status(400).json({ error: 'Thiếu targetId' });
+
+      await User.findByIdAndUpdate(meId, { $pull: { friends: targetId } });
+      await User.findByIdAndUpdate(targetId, { $pull: { friends: meId } });
+
+      // Xóa luôn các request cũ nếu còn sót lại
+      await FriendRequest.deleteMany({
+          $or: [
+              { from: meId, to: targetId },
+              { from: targetId, to: meId }
+          ]
+      });
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Remove Friend Error:', err);
+      res.status(500).json({ error: 'Lỗi server' });
+    }
   }
-}
-
-module.exports = {
-  listFriends,
-  listAllUsers,
-  sendRequest,
-  listRequests,
-  respondRequest,
-  removeFriend
 };
 
-// const mongoose = require('mongoose');
-// const User = require('../models/User');
-// const FriendRequest = require('../models/FriendRequest');
-
-// async function listFriends(req, res) {
-//   try {
-//     const userId = req.session?.user?._id;
-//     if (!userId || !mongoose.isValidObjectId(userId)) {
-//       return res.status(401).json({ error: 'Chưa đăng nhập hoặc ID không hợp lệ' });
-//     }
-
-//     const me = await User.findById(userId)
-//       .populate({ path: 'friends', select: '_id nickname avatar' })
-//       .lean();
-
-//     if (!me) return res.status(404).json({ error: 'User không tồn tại' });
-
-//     // 🔧 Loại bỏ trùng lặp
-//     const uniqueFriends = [
-//       ...new Map((me.friends || []).map(u => [u._id.toString(), u])).values()
-//     ];
-
-//     const friends = uniqueFriends.map(u => ({
-//       id: u._id,
-//       nickname: u.nickname,
-//       avatar: u.avatar || 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png'
-//     }));
-
-//     res.json(friends);
-//   } catch (err) {
-//     console.error('❌ Lỗi listFriends:', err);
-//     res.status(500).json({ error: 'Server error', detail: err.message });
-//   }
-// }
-
-// async function listAllUsers(req, res) {
-//   try {
-//     const meId = req.session?.user?._id;
-//     if (!meId || !mongoose.isValidObjectId(meId)) {
-//       return res.status(401).json({ error: 'Chưa đăng nhập hoặc ID không hợp lệ' });
-//     }
-
-//     const me = await User.findById(meId).lean();
-//     const myFriends = me?.friends || [];
-
-//     const allUsers = await User.find({ _id: { $ne: meId } })
-//       .select('_id nickname avatar')
-//       .lean();
-
-//     const requests = await FriendRequest.find({
-//       $or: [{ from: meId }, { to: meId }]
-//     }).select('from to').lean();
-
-//     const result = allUsers.map(u => {
-//       let status = 'none';
-//       if (myFriends.some(id => id.equals(u._id))) status = 'friend';
-//       else if (requests.find(r => r.from.equals(meId) && r.to.equals(u._id))) status = 'pending';
-//       else if (requests.find(r => r.to.equals(meId) && r.from.equals(u._id))) status = 'incoming';
-
-//       return {
-//         id: u._id,
-//         nickname: u.nickname,
-//         avatar: u.avatar || 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png',
-//         status
-//       };
-//     });
-
-//     res.json(result);
-//   } catch (err) {
-//     console.error('❌ Lỗi listAllUsers:', err);
-//     res.status(500).json({ error: 'Server error', detail: err.message });
-//   }
-// }
-
-// async function sendRequest(req, res) {
-//   try {
-//     const from = req.session?.user?._id;
-//     const { to } = req.body;
-
-//     if (!from || !to || from === to || !mongoose.isValidObjectId(to)) {
-//       return res.status(400).json({ error: 'Yêu cầu không hợp lệ' });
-//     }
-
-//     const alreadyFriend = await User.exists({ _id: from, friends: to });
-//     if (alreadyFriend) {
-//       return res.status(400).json({ error: 'Hai người đã là bạn bè' });
-//     }
-
-//     const exists = await FriendRequest.findOne({ from, to });
-//     if (exists) return res.json({ success: true });
-
-//     await FriendRequest.create({ from, to });
-//     res.json({ success: true });
-//   } catch (err) {
-//     console.error('❌ Lỗi sendRequest:', err);
-//     res.status(500).json({ error: 'Server error', detail: err.message });
-//   }
-// }
-
-// async function listRequests(req, res) {
-//   try {
-//     const meId = req.session?.user?._id;
-//     if (!meId || !mongoose.isValidObjectId(meId)) {
-//       return res.status(401).json({ error: 'Chưa đăng nhập hoặc ID không hợp lệ' });
-//     }
-
-//     const arr = await FriendRequest.find({ to: meId })
-//       .populate('from', '_id nickname avatar')
-//       .lean();
-
-//     const result = arr.map(r => ({
-//       reqId: r._id,
-//       id: r.from._id,
-//       nickname: r.from.nickname,
-//       avatar: r.from.avatar || 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png'
-//     }));
-
-//     res.json(result);
-//   } catch (err) {
-//     console.error('❌ Lỗi listRequests:', err);
-//     res.status(500).json({ error: 'Server error', detail: err.message });
-//   }
-// }
-
-// async function respondRequest(req, res) {
-//   try {
-//     const meId = req.session?.user?._id;
-//     const { requestId, action } = req.body;
-
-//     if (!meId || !requestId || !['accept', 'reject'].includes(action) || !mongoose.isValidObjectId(requestId)) {
-//       return res.status(400).json({ error: 'Dữ liệu không hợp lệ' });
-//     }
-
-//     const reqDoc = await FriendRequest.findById(requestId);
-//     if (!reqDoc) return res.status(404).json({ error: 'Không tìm thấy lời mời' });
-
-//     if (action === 'accept') {
-//       const fromUser = await User.findById(reqDoc.from);
-//       const toUser = await User.findById(reqDoc.to);
-//       if (!fromUser || !toUser) return res.status(404).json({ error: 'Người dùng không tồn tại' });
-
-//       // ✅ thêm bạn 2 chiều, có kiểm tra trùng
-//       if (!fromUser.friends.includes(toUser._id)) fromUser.friends.push(toUser._id);
-//       if (!toUser.friends.includes(fromUser._id)) toUser.friends.push(fromUser._id);
-//       await fromUser.save();
-//       await toUser.save();
-//     }
-
-//     await reqDoc.deleteOne();
-//     res.json({ success: true });
-//   } catch (err) {
-//     console.error('❌ Lỗi respondRequest:', err);
-//     res.status(500).json({ error: 'Server error', detail: err.message });
-//   }
-// }
-
-// async function removeFriend(req, res) {
-//   try {
-//     const meId = req.session?.user?._id;
-//     const { targetId } = req.body;
-
-//     if (!meId || !targetId || !mongoose.isValidObjectId(targetId)) {
-//       return res.status(400).json({ error: 'Dữ liệu không hợp lệ' });
-//     }
-
-//     await User.findByIdAndUpdate(meId, { $pull: { friends: targetId } });
-//     await User.findByIdAndUpdate(targetId, { $pull: { friends: meId } });
-
-//     res.json({ success: true });
-//   } catch (err) {
-//     console.error('❌ Lỗi removeFriend:', err);
-//     res.status(500).json({ error: 'Server error', detail: err.message });
-//   }
-// }
-
-// module.exports = {
-//   listFriends,
-//   listAllUsers,
-//   sendRequest,
-//   listRequests,
-//   respondRequest,
-//   removeFriend
-// };
+module.exports = friendController;

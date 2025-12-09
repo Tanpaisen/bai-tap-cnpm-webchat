@@ -17,7 +17,7 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let subfolder = 'files';
     if (file.fieldname === 'avatar') subfolder = 'avatars';
-    else if (file.fieldname === 'image') subfolder = 'images';
+    else if (file.fieldname === 'image' || file.fieldname === 'background') subfolder = 'images';
 
     const uploadPath = path.resolve(__dirname, '..', 'uploads', subfolder);
     ensureDirExists(uploadPath);
@@ -54,7 +54,7 @@ const upload = multer({
     cb(null, true);
   },
   limits: {
-    fileSize: 2 * 1024 * 1024 // 2MB
+    fileSize: 5 * 1024 * 1024 // 2MB
   }
 });
 

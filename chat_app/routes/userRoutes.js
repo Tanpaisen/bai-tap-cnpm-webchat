@@ -1,70 +1,58 @@
-// chat_app/routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
 const { ensureLoggedInJSON } = require('../middleware/auth')
 const userController = require('../controllers/userController');
 const upload = require('../config/multer');
-const mongoose = require('mongoose');
-const User = require('../models/User')
+
+//========================================================
+// Các Route Profile & Cơ bản 
+//========================================================
 
 // Lấy thông tin profile người dùng
-router.get(
-  '/profile',
-  ensureLoggedInJSON,
-  userController.getProfile
-);
+router.get('/profile', ensureLoggedInJSON, userController.getProfile);
 
-// Cập nhật nickname
-router.post(
-  '/update-nickname',
-  ensureLoggedInJSON,
-  userController.updateNickname
-);
+// Lấy thông tin profile người dùng khác
+router.get('/info/:userId', ensureLoggedInJSON, userController.getUserProfile);
 
-// Cập nhật avatar
-router.post(
-  '/update-avatar',
-  ensureLoggedInJSON,
-  upload.single('avatar'),
-  userController.updateAvatar
-);
+// ✅ Cập nhật toàn bộ profile (nickname, avatar, ngày sinh, giới tính)
+router.post('/update-profile', ensureLoggedInJSON, userController.updateProfile);
 
 // Route đổi mật khẩu
+router.post('/update-password', ensureLoggedInJSON, userController.updatePassword);
+
+//========================================================
+// ⚙️ Các Route CÀI ĐẶT MỚI (Từ mục Setting)
+//========================================================
+
+// 1. Trạng thái hoạt động (Bật/Tắt hiển thị online)
 router.post(
-  '/update-password',       // 1st arg: đường dẫn (string)
-  ensureLoggedInJSON,       // 2nd arg: middleware (function)
-  userController.updatePassword  // 3rd arg: handler chính (function)
+  '/settings/update-status',
+  ensureLoggedInJSON,
+  userController.updateIncomingStatus
 );
 
+// 2. Giao diện (Cập nhật hình nền)
+// Sử dụng middleware upload file cho trường 'background'
+router.post(
+  '/settings/update-background',
+  ensureLoggedInJSON,
+  upload.single('background'),
+  userController.updateBackground
+);
 
-// GET user theo ID
-router.get('/:userId', async (req, res) => {
-  const { userId } = req.params;
+// 3. Quản lý tin nhắn (Xóa lịch sử chat với 1 người bạn)
+router.post(
+  '/settings/delete-history',
+  ensureLoggedInJSON,
+  userController.deleteChatHistory
+);
 
-  // Kiểm tra ID có phải là ObjectId hợp lệ không
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    // ✅ Sửa: Dùng 400 Bad Request và định dạng lỗi 'error'
-    return res.status(400).json({ error: 'ID người dùng không hợp lệ' });
-  }
-
-  try {
-    // ✅ Lỗi logic cũ đã được sửa: dùng userId
-    const user = await User.findById(userId).select('_id nickname avatar online'); // Chỉ lấy các trường cần thiết
-
-    if (!user) {
-      // ✅ Tối ưu: Dùng định dạng lỗi 'error'
-      return res.status(404).json({ error: 'Người dùng không tồn tại' });
-    }
-
-    // ✅ Tối ưu: Trả về đối tượng user trực tiếp
-    res.json(user);
-
-  } catch (err) {
-    console.error('❌ GET /:userId error:', err);
-    // ✅ Tối ưu: Dùng định dạng lỗi 'error'
-    res.status(500).json({ error: 'Lỗi server khi truy vấn người dùng' });
-  }
-});
+// 4. Tài khoản & Bảo mật (Cập nhật thông tin cá nhân: ngày sinh, giới tính)
+router.post(
+  '/settings/update-personal-info',
+  ensureLoggedInJSON,
+  userController.updatePersonalInfo
+);
 
 
 module.exports = router;

@@ -80,4 +80,32 @@ router.post('/file', ensureLoggedInJSON, upload.single('file'), (req, res) => {
   res.json({ success: true, url });
 });
 
+// ✅ Upload background + lưu vào DB
+router.post('/background', ensureLoggedInJSON, upload.single('background'), async (req, res) => {
+  try {
+    if (!req.file || !req.file.mimetype.startsWith('image/')) {
+      return res.status(400).json({ error: 'Chỉ được upload ảnh làm background' });
+    }
+
+    const backgroundUrl = `/uploads/images/${req.file.filename}`;
+    
+    // Cập nhật vào DB
+    const user = await User.findByIdAndUpdate(
+      req.session.user._id,
+      { background: backgroundUrl },
+      { new: true }
+    );
+
+    // Cập nhật session luôn
+    req.session.user.background = user.background;
+
+    console.log('📦 Background đã lưu:', backgroundUrl);
+    res.json({ success: true, background: user.background });
+  } catch (err) {
+    console.error('❌ Lỗi upload background:', err);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+
 module.exports = router;

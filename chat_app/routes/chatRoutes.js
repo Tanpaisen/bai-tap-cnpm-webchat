@@ -1,20 +1,36 @@
-//btl/chat_app/routes/chatRoutes.js
-const express = require('express') 
-const router = express.Router() 
-const { ensureLoggedInJSON } = require('../middleware/auth')
-const chatController = require('../controllers/chatController')
+const express = require('express');
+const router = express.Router();
+const { ensureLoggedInJSON } = require('../middleware/auth');
+const chatController = require('../controllers/chatController');
 
-// Lấy lịch sử chat 
-router.get(
-    '/history', 
-    ensureLoggedInJSON, 
-    chatController.getHistory ) 
+// 1. Lấy danh sách chat
+router.get('/chats', ensureLoggedInJSON, chatController.getChatList);
 
-// Lưu và broadcast tin nhắn mới 
+// 2. Lấy lịch sử tin nhắn
+router.get('/history', ensureLoggedInJSON, chatController.getChatHistory);
 
-router.post( 
-    '/send', 
-    ensureLoggedInJSON, 
-    chatController.sendMessageREST 
-) 
-module.exports = router
+// 3. Gửi tin nhắn
+router.post('/send', ensureLoggedInJSON, chatController.sendMessage);
+
+// 4. Tạo nhóm
+router.post('/create-group', ensureLoggedInJSON, chatController.createGroup);
+
+// 5. Lấy thông tin nhóm
+router.get('/group/:id', ensureLoggedInJSON, chatController.getGroupInfo);
+
+// 6. Thêm thành viên vào nhóm
+router.post('/group/add-member', ensureLoggedInJSON, chatController.addMemberToGroup);
+
+// 7. Đổi tên nhóm
+router.post('/group/rename', ensureLoggedInJSON, chatController.renameGroup);
+
+// ✅ 8. NEW: Xóa nhóm (Chỉ admin)
+router.post('/group/delete', ensureLoggedInJSON, chatController.deleteGroup);
+
+// ✅ 9. NEW: Xóa thành viên (Chỉ admin)
+router.post('/group/remove-member', ensureLoggedInJSON, chatController.removeMemberFromGroup);
+
+// 10. Đặt biệt danh
+// router.post('/group/rename-member', ensureLoggedInJSON, chatController.renameMemberFromGroup);
+
+module.exports = router;

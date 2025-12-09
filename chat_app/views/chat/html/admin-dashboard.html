@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Quản lý Chat App</title>
+    <link rel="stylesheet" href="/chat/styleAdmin.css">
+</head>
+
+<body>
+
+    <header class="admin-header">
+        <h1>Bảng Điều Khiển Quản Trị</h1>
+        <nav>
+            <a href="#users" class="active">Quản lý Người dùng</a>
+            <a href="#reports">Báo cáo & Nội dung</a>
+            <a href="#stats">Thống kê</a>
+            <a href="/logout" class="logout-btn">Đăng xuất</a>
+        </nav>
+    </header>
+
+    <main class="admin-main">
+
+        <!-- === Quản lý người dùng === -->
+        <section id="users" class="dashboard-section active" style="display: block;">
+            <h2>👤 Quản lý Người dùng</h2>
+
+            <div class="user-search-filter">
+                <input type="text" id="userSearchInput" placeholder="Tìm kiếm theo ID, username...">
+
+                <select id="userFilterRole">
+                    <option value="all">Tất cả Vai trò</option>
+                    <option value="user">Người dùng (User)</option>
+                    <option value="admin">Quản trị viên (Admin)</option>
+                    <option value="superadmin">Quản trị viên Cấp cao (Superadmin)</option>
+                </select>
+
+                <select id="userFilterStatus">
+                    <option value="all">Tất cả Trạng thái</option>
+                    <option value="active">Đang hoạt động</option>
+                    <option value="banned">Đang bị khóa</option>
+                </select>
+            </div>
+
+            <table id="userTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Nickname</th>
+                        <th>Vai trò</th>
+                        <th>Trạng thái</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="userList">
+                    <tr>
+                        <td colspan="6">Đang tải danh sách người dùng...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <hr>
+
+        <!-- === Báo cáo === -->
+        <section id="reports" class="dashboard-section" style="display: none;">
+            <h2>💬 Quản lý Báo cáo & Nội dung</h2>
+            <div class="report-list" id="reportList">
+                <div class="report-item">
+                    <strong>Báo cáo #123:</strong> Người dùng `X` bị báo cáo về nội dung xúc phạm.
+                    <button data-report-id="123" class="btn-review">Xem & Xử lý</button>
+                </div>
+            </div>
+
+            <h3>Cấu hình Hệ thống</h3>
+            <div class="system-config">
+                <label for="profanityFilter">Bộ lọc Từ cấm (Blacklist):</label>
+                <textarea id="profanityFilter" rows="3">từ_cấm_1, từ_cấm_2, ...</textarea>
+                <button id="saveConfigBtn" class="btn-primary">Lưu Cấu hình</button>
+            </div>
+        </section>
+
+        <hr>
+
+        <!-- === Thống kê === -->
+        <section id="stats" class="dashboard-section" style="display: none;">
+            <h2>📈 Thống kê & Hoạt động</h2>
+            <div class="stats-grid">
+                <div class="stat-card">Tổng người dùng: <span id="totalUsers">0</span></div>
+                <div class="stat-card">Người dùng mới (24h): <span id="newUsers">0</span></div>
+                <div class="stat-card">Tổng tin nhắn gửi: <span id="totalMessages">0</span></div>
+                <div class="stat-card">Tình trạng Server: <span id="serverStatus" class="status-ok">Ổn định</span></div>
+            </div>
+
+            <h3>Lịch sử Hoạt động Admin (Audit Log)</h3>
+            <ul id="auditLogList">
+                <li>Đang tải nhật ký...</li>
+            </ul>
+
+            <h3>📊 Thống kê Hoạt động Người dùng (7 ngày qua)</h3>
+            <p>Tổng số người dùng đăng nhập trong tuần: <strong id="uniqueUsersWeek">N/A</strong></p>
+            <p>Số ngày có người dùng truy cập: <strong id="accessDaysCount">N/A</strong></p>
+            <p>Tần suất truy cập trung bình/ngày: <strong id="avgVisits">N/A</strong> lần</p>
+
+            <h4>Phân phối Tần suất Truy cập:</h4>
+            <ul id="frequencyList" class="audit-log-list"></ul>
+        </section>
+
+    </main>
+
+    <!-- === Modal Chi tiết User === -->
+    <div id="userDetailsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-btn" id="closeModalBtn">&times;</span>
+            <div id="modalContent">
+                <p>Đang tải chi tiết...</p>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="/chat/js/admin.js"></script>
+</body>
+
+</html>

@@ -1,32 +1,26 @@
-//routes/friendRoutes.js
 const express = require('express');
 const router = express.Router();
 const { ensureLoggedInJSON } = require('../middleware/auth');
 const friendController = require('../controllers/friendController');
 
-// ✅ Lấy danh sách bạn bè hiện tại
+// 1. Lấy danh sách bạn bè
 router.get('/', ensureLoggedInJSON, friendController.listFriends);
+router.get('/list', ensureLoggedInJSON, friendController.listFriends); // Alias
 
-// ✅ Alias: /api/friends/list
-router.get('/list', ensureLoggedInJSON, friendController.listFriends);
+// 2. route all-users
+router.get('/all-users', ensureLoggedInJSON, friendController.listAllUsers);
+router.get('/all', ensureLoggedInJSON, friendController.listAllUsers); // Alias cũ
 
-// ✅ Lấy tất cả user để mời kết bạn
-router.get('/all', ensureLoggedInJSON, friendController.listAllUsers);
-
-// ✅ Gửi lời mời kết bạn
+// 3. Gửi lời mời
 router.post('/send', ensureLoggedInJSON, friendController.sendRequest);
 
-// ✅ Lấy danh sách lời mời đến
+// 4. Lấy danh sách lời mời (Fix lỗi 500 ở controller)
 router.get('/requests', ensureLoggedInJSON, friendController.listRequests);
 
-// ✅ Phản hồi lời mời: accept hoặc reject
+// 5. Phản hồi lời mời
 router.post('/requests/respond', ensureLoggedInJSON, friendController.respondRequest);
 
-// ✅ Gợi ý mở rộng: hủy kết bạn
-router.post('/remove', ensureLoggedInJSON, friendController.removeFriend); // cần thêm controller
-
-// hủy bạn
+// 6. Hủy kết bạn
 router.post('/remove', ensureLoggedInJSON, friendController.removeFriend);
-
 
 module.exports = router;

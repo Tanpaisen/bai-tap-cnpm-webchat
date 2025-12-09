@@ -1,15 +1,16 @@
-//models/Message.js
 const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
 
-const messageSchema = new Schema({
-  sender:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  receiver: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  room:     { type: String, required: true },
+const messageSchema = new mongoose.Schema({
+  chat: { type: mongoose.Schema.Types.ObjectId, ref: 'Chat', required: true },
+  
+  sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  
   content: { type: String, maxlength: 5000 },
-  image:    { type: String },
-  file:     { type: String }
+  image: { type: String },
+  file: { type: String },
+  
+  // Loại tin nhắn: text, image, file, hoặc system (thông báo hệ thống)
+  type: { type: String, default: 'text' } 
 }, { timestamps: true });
 
-
-module.exports = mongoose.model('Message', messageSchema);
+module.exports = mongoose.models.Message || mongoose.model('Message', messageSchema);

@@ -1,103 +1,244 @@
-<!-- btl/auth_app/views/setup-nickname.html -->
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <title>Thiết lập Nickname</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/chat/style.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thiết lập Profile - Evelyn Earth</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            bg: '#050505',
+                            card: '#111111',
+                            input: '#1a1a1a',
+                            purple: '#8b5cf6',
+                            purpleHover: '#7c3aed',
+                            text: '#e5e5e5',
+                            muted: '#a3a3a3',
+                            border: '#262626'
+                        }
+                    },
+                    boxShadow: {
+                        'glow': '0 0 20px rgba(139, 92, 246, 0.3)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Date Input Styling */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            opacity: 0.6;
+            cursor: pointer;
+        }
+        
+        .avatar-hover:hover .avatar-overlay { opacity: 1; }
+    </style>
 </head>
-<body>
-  <div class="auth-container">
-    <form id="setup-form" class="auth-form">
-      <h2>Ảnh đại diện</h2>
-      <img id="preview"
-           src="https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png"
-           width="100"
-           alt="Avatar preview" />
-      <input type="file" id="avatar" accept="image/*" />
 
-      <h2>Chọn nickname</h2>
-      <input type="text" id="nickname" placeholder="Nhập nickname..." maxlength="30" required />
+<body class="bg-black text-brand-text min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    
+    <!-- Background Effects -->
+    <div class="absolute inset-0 pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-brand-purple/10 rounded-full blur-[120px]"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[100px]"></div>
+    </div>
 
-      <button type="submit">Tiếp tục</button>
-    </form>
-  </div>
+    <!-- Main Card -->
+    <div class="w-full max-w-md bg-brand-card border border-brand-border rounded-2xl shadow-glow p-8 relative z-10 animate-[fadeIn_0.5s_ease-out]">
+        
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-white mb-2">Hoàn tất hồ sơ</h1>
+            <p class="text-brand-muted text-sm">Hãy cho mọi người biết thêm về bạn</p>
+        </div>
 
-  <script>
-    const DEFAULT_AVATAR = 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png';
-    const preview = document.getElementById('preview');
-    const avatarInput = document.getElementById('avatar');
-    const nicknameInput = document.getElementById('nickname');
+        <form id="setup-form" class="space-y-6">
+            
+            <!-- Avatar Upload Section -->
+            <div class="flex flex-col items-center">
+                <div class="relative w-32 h-32 rounded-full cursor-pointer avatar-hover group border-4 border-brand-input shadow-lg overflow-hidden">
+                    <img id="preview" 
+                         src="https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png" 
+                         class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" 
+                         alt="Avatar preview" />
+                    
+                    <!-- Overlay with Camera Icon -->
+                    <div class="avatar-overlay absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 transition-opacity duration-300">
+                        <i class="fa-solid fa-camera text-white text-2xl"></i>
+                    </div>
+                    
+                    <!-- Hidden File Input -->
+                    <input type="file" id="avatar" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                </div>
+                <p class="text-xs text-brand-muted mt-3">Nhấn vào ảnh để thay đổi (Tối đa 2MB)</p>
+            </div>
 
-    // Xem trước ảnh
-    avatarInput.addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (file) {
-        if (file.size > 2 * 1024 * 1024) {
-          alert('Ảnh quá lớn (tối đa 2MB)');
-          avatarInput.value = '';
-          preview.src = DEFAULT_AVATAR;
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => (preview.src = reader.result);
-        reader.readAsDataURL(file);
-      } else {
-        preview.src = DEFAULT_AVATAR;
-      }
-    });
+            <!-- Nickname Input -->
+            <div>
+                <label class="block text-xs font-semibold text-brand-muted mb-1.5 ml-1">Nickname hiển thị</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-regular fa-user text-zinc-500"></i>
+                    </div>
+                    <input type="text" id="nickname" placeholder="Ví dụ: Evelyn Hunter" maxlength="30" required 
+                        class="w-full bg-brand-input border border-brand-border rounded-lg pl-10 pr-4 py-3 text-sm text-white focus:border-brand-purple focus:ring-1 focus:ring-brand-purple outline-none transition-all placeholder-zinc-600">
+                </div>
+            </div>
 
-    // Submit form
-    document.getElementById('setup-form').addEventListener('submit', async e => {
-      e.preventDefault();
-      const nick = nicknameInput.value.trim();
-      const file = avatarInput.files[0];
+            <!-- Birthdate & Gender Grid -->
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Birthdate -->
+                <div>
+                    <label class="block text-xs font-semibold text-brand-muted mb-1.5 ml-1">Ngày sinh</label>
+                    <div class="relative">
+                        <input type="date" id="birthdate" required 
+                            class="w-full bg-brand-input border border-brand-border rounded-lg px-3 py-3 text-sm text-white focus:border-brand-purple focus:ring-1 focus:ring-brand-purple outline-none transition-all text-zinc-400 focus:text-white">
+                    </div>
+                </div>
 
-      if (!nick) return alert('Vui lòng nhập nickname');
-      if (nick.length < 2 || nick.length > 30) return alert('Nickname phải dài 2–30 ký tự');
+                <!-- Gender -->
+                <div>
+                    <label class="block text-xs font-semibold text-brand-muted mb-1.5 ml-1">Giới tính</label>
+                    <div class="relative">
+                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-venus-mars text-zinc-500 text-xs"></i>
+                        </div>
+                        <select id="gender" required 
+                            class="w-full bg-brand-input border border-brand-border rounded-lg pl-9 pr-8 py-3 text-sm text-white focus:border-brand-purple focus:ring-1 focus:ring-brand-purple outline-none transition-all appearance-none cursor-pointer">
+                            <option value="" disabled selected class="text-zinc-500">Chọn...</option>
+                            <option value="male">Nam</option>
+                            <option value="female">Nữ</option>
+                            <option value="other">Khác</option>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-chevron-down text-zinc-600 text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-      let avatarUrl = DEFAULT_AVATAR;
+            <!-- Submit Button -->
+            <button type="submit" id="submit-btn" class="w-full bg-gradient-to-r from-brand-purple to-violet-600 hover:from-violet-600 hover:to-brand-purple text-white font-bold py-3.5 rounded-lg shadow-lg shadow-purple-900/30 transform transition-all active:scale-[0.98] flex items-center justify-center gap-2 group">
+                <span>Hoàn tất & Bắt đầu Chat</span>
+                <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+            </button>
 
-      // Upload avatar nếu có
-      if (file) {
-        try {
-          const formData = new FormData();
-          formData.append('avatar', file);
-          const res = await fetch('/api/upload/avatar', {
-            method: 'POST',
-            body: formData,
-            credentials: 'include'
-          });
-          if (!res.ok) throw new Error('Upload thất bại');
-          const data = await res.json();
-          if (data.success && data.url) avatarUrl = data.url;
-          else throw new Error(data.error || 'Upload lỗi');
-        } catch (err) {
-          alert('Không thể tải ảnh: ' + err.message);
-          preview.src = DEFAULT_AVATAR;
-          avatarUrl = DEFAULT_AVATAR;
-        }
-      }
+        </form>
+    </div>
 
-      // Gửi nickname và avatar
-      try {
-        const res = await fetch('/api/users/update-nickname', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nickname: nick, avatar: avatarUrl })
+    <!-- Error/Loading Overlay (Optional) -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center flex-col">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-purple mb-4"></div>
+        <p class="text-white text-sm font-medium animate-pulse">Đang cập nhật hồ sơ...</p>
+    </div>
+
+    <script>
+        const DEFAULT_AVATAR = 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png';
+        const preview = document.getElementById('preview');
+        const avatarInput = document.getElementById('avatar');
+        const nicknameInput = document.getElementById('nickname');
+        const birthInput = document.getElementById('birthdate');
+        const genderSelect = document.getElementById('gender');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        // Logic 1: Xem trước ảnh (Preview Avatar)
+        avatarInput.addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.size > 2 * 1024 * 1024) { // 2MB Limit
+                    alert('Ảnh quá lớn (tối đa 2MB)');
+                    avatarInput.value = '';
+                    preview.src = DEFAULT_AVATAR;
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = () => (preview.src = reader.result);
+                reader.readAsDataURL(file);
+            } else {
+                preview.src = DEFAULT_AVATAR;
+            }
         });
-        if (!res.ok) throw new Error('Cập nhật thất bại');
-        const data = await res.json();
-        if (data.success) {
-          return (window.location.href = '/chat');
-        }
-        throw new Error(data.error || 'Thiết lập thất bại');
-      } catch (err) {
-        alert(err.message);
-      }
-    });
-  </script>
+
+        // Logic 2: Xử lý Submit Form
+        document.getElementById('setup-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            
+            const nick = nicknameInput.value.trim();
+            const file = avatarInput.files[0];
+            const birthdate = birthInput.value;
+            const gender = genderSelect.value;
+
+            // Validate Frontend
+            if (!nick) return alert('Vui lòng nhập nickname');
+            if (!birthdate) return alert('Vui lòng chọn ngày sinh');
+            if (!gender) return alert('Vui lòng chọn giới tính');
+            if (nick.length < 2 || nick.length > 30) return alert('Nickname phải dài 2–30 ký tự');
+
+            // Show loading
+            loadingOverlay.classList.remove('hidden');
+
+            let avatarUrl = DEFAULT_AVATAR;
+
+            try {
+                // A. Upload Avatar (Nếu user chọn ảnh mới)
+                if (file) {
+                    const formData = new FormData();
+                    formData.append('avatar', file);
+                    
+                    const uploadRes = await fetch('/api/upload/avatar', {
+                        method: 'POST',
+                        body: formData,
+                        // Note: Fetch tự động set Content-Type multipart/form-data kèm boundary
+                    });
+
+                    if (!uploadRes.ok) throw new Error('Upload ảnh thất bại');
+                    
+                    const uploadData = await uploadRes.json();
+                    if (uploadData.success && uploadData.url) {
+                        avatarUrl = uploadData.url;
+                    }
+                }
+
+                // B. Gửi thông tin Profile
+                const updateRes = await fetch('/api/users/update-profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nickname: nick,
+                        avatar: avatarUrl,
+                        dateOfBirth: birthdate,
+                        gender: gender
+                    })
+                });
+
+                const updateData = await updateRes.json();
+
+                if (updateData.success) {
+                    // Thành công -> Chuyển hướng vào trang Chat chính
+                    window.location.href = '/chat';
+                } else {
+                    throw new Error(updateData.error || 'Thiết lập thất bại');
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert('Có lỗi xảy ra: ' + err.message);
+                loadingOverlay.classList.add('hidden'); // Ẩn loading nếu lỗi để user thử lại
+            }
+        });
+    </script>
 </body>
 </html>

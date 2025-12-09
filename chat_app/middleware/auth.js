@@ -39,7 +39,44 @@ const userIdString = userId.toString();
     return next();
 }
 
+/**
+ * Middleware bảo vệ các route ADMIN (dạng JSON API):
+ * Chỉ cho phép người dùng có role là 'admin' hoặc 'superadmin'
+ */
+function ensureAdmin(req, res, next) {
+    const userRole = req.session?.user?.role;
+    
+    // 💡 GIẢ ĐỊNH: role được lưu trong req.session.user.role khi đăng nhập
+    if (userRole === 'admin' || userRole === 'superadmin') {
+        return next();
+    }
+
+    console.warn(`🔒 Chặn truy cập Admin: Vai trò '${userRole}' không đủ quyền.`);
+    // Trả về lỗi 403 (Forbidden) vì người dùng đã đăng nhập nhưng không có quyền
+    return res.status(403).json({ error: 'Truy cập bị từ chối. Bạn không có quyền quản trị.' });
+}
+
+function ensureSuperAdmin(req, res, next) {
+    const user = req.session?.user;
+
+    if (!user) {
+        console.warn('🔒 Chặn truy cập SuperAdmin: Chưa đăng nhập');
+        return res.status(401).json({ success: false, error: 'Chưa đăng nhập' });
+    }
+
+    if (user.role !== 'superadmin') {
+        console.warn(`🔒 Chặn truy cập SuperAdmin: Vai trò '${user.role}' không đủ quyền`);
+        return res.status(403).json({ success: false, error: 'Chỉ SuperAdmin mới có quyền truy cập' });
+    }
+
+    req.user = user; // ✅ Gán lại để các route sau có thể sử dụng
+    next();
+}
+
+
 module.exports = {
   ensureLoggedIn,
-  ensureLoggedInJSON
+  ensureLoggedInJSON,
+  ensureAdmin,
+  ensureSuperAdmin
 };

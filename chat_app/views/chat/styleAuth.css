@@ -85,19 +85,44 @@ form button:hover {
   margin: 0 6px;
   cursor: pointer;
 }
+/* ------------------------------------------------------------------- */
+/* 1. General Styles: Apply to ALL body states (login, register, etc.) */
+/* ------------------------------------------------------------------- */
 body {
-  font-family: 'Segoe UI', sans-serif;
-  background: url('https://images.hdqwalls.com/download/twilight-sea-stars-dusk-dawn-dark-sunset-82-2560x1440.jpg') no-repeat center center fixed;
-  background-size: cover;
-  display: flex;
-  justify-content: center;
-  align-items: center;          
-  height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+    
+    /* Layout for centering content */
+    display: flex;
+    justify-content: center;
+    align-items: center; 
+    height: 100vh;
+    
+    /* Background settings common to all image backgrounds */
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-attachment: fixed;
 }
+
+/* ------------------------------------------------------------------- */
+/* 2. Specific Image Backgrounds */
+/* ------------------------------------------------------------------- */
+body.login {
+    background-image: url('https://giasudiem10.edu.vn/wp-content/uploads/2023/06/5-dieu-bac-ho-day.jpg');
+}
+
+body.register {
+    background-image: url('https://cdn.voh.com.vn/voh/thumbnail/2022/05/16/5-dieu-bac-ho-day-thanh-nien-thumb-2.jpg');
+}
+
+/* ------------------------------------------------------------------- */
+/* 3. Overlay for Readability */
+/* ------------------------------------------------------------------- */
 body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.3); /* hoặc rgba(0,0,0,0.2) nếu cần tối */
-  z-index: -1;
+    content: "";
+    position: fixed;
+    inset: 0;
+    /* Semi-transparent white overlay to brighten the background */
+    background: rgba(255, 255, 255, 0.3); 
+    z-index: -1;
 }
