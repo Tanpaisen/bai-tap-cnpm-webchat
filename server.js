@@ -1,20 +1,19 @@
 // btl/server.js
+require('dotenv').config(); // Đảm bảo load biến môi trường đầu tiên
 const http = require('http');
 const mongoose = require('mongoose');
-// const { Server } = require('socket.io'); // ❌ XÓA DÒNG NÀY
-const { app, sessionMiddleware } = require('./app/app');
-const User = require('./chat_app/models/User');
-const socketManager = require('./chat_app/socket/socketManager'); // ✅ IMPORT MỚI
+const { app, sessionMiddleware } = require('./src/app');
+const User = require('./src/models/User');
+const socketManager = require('./src/socket/socketManager');
 
 const server = http.createServer(app);
 
-// ⚙️ Cho phép cả localhost và DevTunnel
+// ⚙️ Cấu hình CORS linh hoạt hơn
 const allowedOrigins = [
     'http://localhost:3000',
-    'https://n7421zlm-3000.asse.devtunnels.ms'
-];
+    process.env.DEVTUNNEL_URL // Nên để trong .env
+].filter(Boolean); // Loại bỏ giá trị undefined nếu không có env
 
-// ✅ Khởi tạo IO bằng socketManager
 const io = socketManager.init(server, { 
     cors: {
         origin: allowedOrigins,
@@ -24,92 +23,94 @@ const io = socketManager.init(server, {
     pingTimeout: 60000
 });
 
-// Gắn socket.io vào app để có thể emit từ controller (Giữ nguyên)
 app.set('io', io);
 
-// 🧩 Dùng chung session giữa Express & Socket.IO
+// 🧩 Middleware Session cho Socket
 io.use((socket, next) => {
     sessionMiddleware(socket.request, {}, next);
 });
 
-// 🧠 Logic Socket.IO
-io.on('connection', socket => {
+// 🧠 Logic Socket
+io.on('connection', async (socket) => { // Thêm async để xử lý DB an toàn hơn
     const sess = socket.request.session?.user;
-    if (!sess) {
+    
+    // Bảo vệ chặt chẽ hơn: Check cả session và ID
+    if (!sess || !sess._id) {
         socket.emit('unauthorized');
         return socket.disconnect();
     }
 
     const userId = sess._id.toString();
-    const avatar = sess.avatar;
-    const nickname = sess.nickname || 'Ẩn danh';
+    const { avatar, nickname = 'Ẩn danh' } = sess;
 
-    socket.userId = userId;
-    socket.avatar = avatar;
-    socket.nickname = nickname;
+    // Gán thông tin vào socket instance để dùng lại
+    socket.userData = { userId, avatar, nickname };
+    socket.join(userId); // Mẹo: Join room theo UserID để gửi noti cá nhân dễ hơn
 
-    // ✅ GHI NHẬN USER ONLINE VÀO MANAGER
+    // ✅ Thêm vào Manager
     socketManager.addOnlineUser(userId, socket.id); 
+    
+    // Chỉ update DB thành Online nếu đây là connection đầu tiên của user
+    // (Cần logic check trong socketManager, hoặc update "đè" lên cũng không sao)
+    await User.findByIdAndUpdate(userId, { online: true });
+    console.log(`✅ ${nickname} (${userId}) connected`);
 
-    // Đánh dấu online trong DB
-    User.findByIdAndUpdate(userId, { online: true }).catch(console.error);
+    // --- CÁC EVENTS ---
 
-    // Gắn listener typing một lần duy nhất
-    socket.on('typing', () => {
-        if (!socket.currentRoomId) return;
-        socket.to(socket.currentRoomId).emit('typing', {
-            roomId: socket.currentRoomId,
-            from: socket.userId,
-            senderAvatar: socket.avatar,
-            senderNickname: socket.nickname
+    socket.on('typing', ({ roomId }) => {
+        if (!roomId) return;
+        socket.to(roomId).emit('typing', {
+            roomId,
+            from: userId,
+            senderAvatar: avatar,
+            senderNickname: nickname
         });
     });
 
-    socket.on('stopTyping', () => {
-        if (!socket.currentRoomId) return;
-        socket.to(socket.currentRoomId).emit('stopTyping', {
-            roomId: socket.currentRoomId,
-            from: socket.userId
-        });
+    socket.on('stopTyping', ({ roomId }) => {
+        if (!roomId) return;
+        socket.to(roomId).emit('stopTyping', { roomId, from: userId });
     });
 
-    // Người dùng join room
-    socket.on('joinRoom', async roomId => {
+    socket.on('joinRoom', roomId => {
         if (!roomId) return;
         socket.join(roomId);
-        socket.currentRoomId = roomId;
-        console.log(`✅ ${nickname} joined room ${roomId}`);
+        console.log(`👥 ${nickname} joined room ${roomId}`);
     });
 
     socket.on('newMessage', fullMsg => {
-        if (!fullMsg || !fullMsg.roomId || !fullMsg.sender) {
-            return console.warn('⚠️ Invalid message payload.');
+        // Validation kỹ hơn
+        if (!fullMsg?.roomId || !fullMsg?.sender) {
+            return console.warn('⚠️ Invalid message payload from', userId);
         }
+        // Gửi cho tất cả trong phòng TRỪ người gửi (socket.to)
+        // Hoặc gửi cho tất cả bao gồm người gửi (io.in) tùy logic FE
         socket.to(fullMsg.roomId).emit('newMessage', fullMsg);
-        console.log(`📩 Broadcast message to room ${fullMsg.roomId}`);
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         console.log(`🔴 ${nickname} disconnected`);
-        // ✅ XÓA USER KHỎI MANAGER KHI DISCONNECT
-        socketManager.removeOnlineUser(userId); 
+        
+        socketManager.removeOnlineUser(userId, socket.id);
+        
+        // Cải thiện logic offline: Check xem user còn kết nối nào khác không?
+        // Giả sử socketManager có hàm check (nếu không có thì nên thêm vào)
+        const isUserStillOnline = socketManager.isUserOnline(userId); 
 
-        // Đánh dấu offline trong DB
-        User.findByIdAndUpdate(userId, { online: false }).catch(console.error);
+        if (!isUserStillOnline) {
+            await User.findByIdAndUpdate(userId, { online: false });
+        }
     });
 });
 
-// 🚀 Kết nối MongoDB và khởi động server
+// 🚀 Start Server
 mongoose
     .connect(process.env.MONGO_URI)
     .then(() => {
-        console.log('✅ MongoDB Atlas connected');
+        console.log('✅ MongoDB Connected');
         const PORT = process.env.PORT || 3000;
         server.listen(PORT, () => {
-            console.log(`🚀 Server running at: http://localhost:${PORT}`);
-            console.log(`🌐 Tunnel: https://n7421zlm-3000.asse.devtunnels.ms`);
+            console.log(`🚀 Server running on port ${PORT}`);
         });
     })
-    .catch(err => {
-        console.error('❌ MongoDB connection error:', err);
-    });
+    .catch(err => console.error('❌ MongoDB Error:', err));
