@@ -1,5 +1,56 @@
 /* ================ INITIALIZATION & CORE ================ */
 
+
+//=============================TEST MOCK=======================================================================//
+// // Biến toàn cục chứa ID của chính mình
+// window.MINE_ID = null;
+// window.socket = null; // Socket toàn cục
+
+// document.addEventListener('DOMContentLoaded', async () => {
+//     console.log("🔄 Core Module Loading...");
+    
+//     // 1. Khởi tạo Socket.IO
+//     window.socket = io();
+
+//     // 2. Load thông tin User (Quan trọng nhất)
+//     await window.loadSessionUser();
+
+//     // 3. Lắng nghe sự kiện socket cơ bản
+//     if (window.socket && window.MINE_ID) {
+//         // Gửi ID mình lên để server biết socket này là của ai
+//         // (Server đã có session rồi nhưng gửi thêm cho chắc chắn nếu cần custom logic)
+//         console.log("✅ Socket connected for User:", window.MINE_ID);
+//     }
+// });
+
+// window.loadSessionUser = async function() {
+//     try {
+//         console.log("📡 Đang lấy thông tin Profile...");
+//         const res = await fetch('/api/users/profile');
+        
+//         if (res.ok) {
+//             const user = await res.json();
+//             // Gán ID vào biến toàn cục
+//             window.MINE_ID = user._id || user.id;
+            
+//             console.log("✅ Đã load User:", user.nickname, "| ID:", window.MINE_ID);
+            
+//             // Cập nhật Avatar góc trái dưới (nếu có trong HTML)
+//             const myAvatar = document.getElementById('profile-avatar');
+//             if (myAvatar) myAvatar.src = user.avatar;
+
+//         } else {
+//             console.warn("⚠️ API Profile lỗi, dùng ID giả định Tester A");
+//             // Fallback: Tự gán ID nếu API lỗi (để test không bị chặn)
+//             window.MINE_ID = "65f2d6c12345678912345678";
+//         }
+//     } catch (e) {
+//         console.error("❌ Lỗi loadSessionUser:", e);
+//         // Fallback đường cùng
+//         window.MINE_ID = "65f2d6c12345678912345678";
+//     }
+// };
+//============================= END TEST MOCK=======================================================================//
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     // 1. Đảm bảo Socket được khởi tạo

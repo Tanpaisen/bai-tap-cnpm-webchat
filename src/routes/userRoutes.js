@@ -8,6 +8,28 @@ const upload = require('../config/multer');
 // Các Route Profile & Cơ bản 
 //========================================================
 
+// ✅ MOCK API PROFILE (QUAN TRỌNG ĐỂ FIX LỖI 404)
+// // Route này trả về thông tin user hiện tại (lấy từ session giả)
+// router.get('/profile', (req, res) => {
+//     // 1. Ưu tiên lấy từ Session (do middleware fake login tạo ra)
+//     const user = req.session.user;
+
+//     // 2. Nếu không có session, trả về dữ liệu cứng (Fallback an toàn)
+//     if (!user) {
+//         return res.json({
+//             _id: "65f2d6c12345678912345678", // ID Tester A
+//             username: "tester_a",
+//             nickname: "Tester A (Cứng)",
+//             avatar: "https://ui-avatars.com/api/?name=Tester+A",
+//             role: "user",
+//             online: true
+//         });
+//     }
+
+//     // 3. Trả về user từ session
+//     res.json(user);
+// });
+
 // Lấy thông tin profile người dùng
 router.get('/profile', ensureLoggedInJSON, userController.getProfile);
 

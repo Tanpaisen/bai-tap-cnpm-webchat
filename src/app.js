@@ -9,11 +9,11 @@ const cors = require('cors');
 require('dotenv').config();
 const passport = require('passport');
 
-// ✅ 1. IMPORT MODELS & CONFIG (Đường dẫn mới trong src)
+// ✅ 1. IMPORT MODELS & CONFIG
 const AccessLog = require('./models/AccessLog');
-require('./config/passport')(passport);
+require('./config/passport')(passport); // Load cấu hình Passport
 
-// ✅ 2. IMPORT ROUTES (Đường dẫn mới trong src)
+// ✅ 2. IMPORT ROUTES
 const authRoutes = require('./routes/authRoutes'); 
 const chatRoutes = require('./routes/chatRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -27,19 +27,23 @@ const { ensureLoggedIn, ensureLoggedInJSON, ensureAdmin } = require('./middlewar
 const app = express();
 
 // ====================================
-// 1️⃣ CORS
+// 1️⃣ CORS CONFIGURATION
 // ====================================
 const allowedOrigins = [
     'http://localhost:3000',
-    'https://n7421zlm-3000.asse.devtunnels.ms'
+    process.env.DEVTUNNEL_URL // Nên thêm biến này trong .env
 ];
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
+        // Cho phép request không có origin (như mobile app hoặc curl)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.includes(origin) || origin.endsWith('.devtunnels.ms')) {
             callback(null, true);
         } else {
-            callback(new Error('❌ CORS blocked for origin: ' + origin));
+            // callback(new Error('❌ CORS blocked for origin: ' + origin)); // Bỏ comment nếu muốn chặn chặt
+            callback(null, true); // Tạm thời cho phép tất cả để dev dễ dàng
         }
     },
     credentials: true
@@ -56,12 +60,13 @@ app.use(cookieParser());
 // 3️⃣ Session Middleware
 // ====================================
 const sessionMiddleware = session({
-    secret: process.env.SESSION_SECRET || 'secret_key',
+    secret: process.env.SESSION_SECRET || 'secret_key_nhom_6',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
     cookie: {
         httpOnly: true,
+        maxAge: 1000 * 60 * 60 * 24, // 1 ngày
         secure: process.env.NODE_ENV === 'production',
         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
     }
@@ -72,88 +77,125 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // ====================================
-// 4️⃣ Anti-Cache for API
+// 4️⃣ Anti-Cache (Tránh lỗi quay lại trang sau khi logout)
 // ====================================
-app.use('/api', (req, res, next) => {
+app.use((req, res, next) => {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     next();
 });
 
 // ====================================
-// ✅ 5️⃣ STATIC FILES (QUAN TRỌNG NHẤT)
+// ✅ 5️⃣ STATIC FILES
 // ====================================
-// Vì app.js nằm trong /src, ta phải nhảy ra ngoài (..) để tìm folder public
 app.use(express.static(path.join(__dirname, '../public')));
-
-// Mapping riêng cho uploads để đảm bảo load ảnh avatar/file
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
+// ====================================
+// 6️⃣ ROUTES MOUNTING
+// ====================================
+// // 🚧 DEV MODE ONLY: GIẢ LẬP ĐĂNG NHẬP ĐỂ TEST CHAT
+// // Bật cái này lên thì không cần Login cũng vào được Chat
+// // Nhớ COMMENT lại khi merge code với Nhóm 1
+// const FAKE_LOGIN_MODE = true; 
 
-// ====================================
-// 6️⃣ API Routes
-// ====================================
+// app.use((req, res, next) => {
+//     // Nếu đang bật chế độ Test -> Ghi đè luôn session (Bất chấp cookie cũ)
+//     if (FAKE_LOGIN_MODE) {
+        
+//         // Check trên thanh địa chỉ: localhost:3000/chat?user=b
+//         const isUserB = req.query.user === 'b'; 
+
+//         if (isUserB) {
+//             // Giả lập User B (Firefox/Tab 2)
+//             req.session.user = {
+//                 _id: "65f2d6c12345678912349999", 
+//                 username: "tester_b",
+//                 nickname: "Tester B (User 2)",
+//                 avatar: "https://ui-avatars.com/api/?name=User+B&background=0D8ABC&color=fff",
+//                 role: "user"
+//             };
+//         } else {
+//             // Giả lập User A (Chrome/Tab 1)
+//             req.session.user = {
+//                 _id: "65f2d6c12345678912345678",
+//                 username: "tester_a",
+//                 nickname: "Tester A (User 1)",
+//                 avatar: "https://ui-avatars.com/api/?name=User+A&background=random",
+//                 role: "user"
+//             };
+//         }
+        
+//         // console.log(`⚠️ FAKE LOGIN ACTIVE: ${req.session.user.nickname}`);
+//     }
+//     next();
+// });
+
+// A. Auth Routes (Login, Register, Setup Nickname, Google)
+// Route này trả về cả Giao diện (HTML) và Logic
 app.use('/', authRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/friends', friendRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/admin', adminRoutes);
+
+// B. API Routes (Trả về JSON data)
+app.use('/api/chat', chatRoutes);     // API lấy tin nhắn, nhóm
+app.use('/api/users', userRoutes);    // API tìm user, profile
+app.use('/api/friends', friendRoutes);// API kết bạn
+app.use('/api/upload', uploadRoutes); // API upload file
+app.use('/api/admin', adminRoutes);   // API thống kê admin
 
 // ====================================
-// 7️⃣ HTML Views Routes
+// 7️⃣ VIEW ROUTES (Core Application Flow)
 // ====================================
-// Định nghĩa đường dẫn tới folder views/html
+// Các route dưới đây giữ lại ở app.js để điều hướng chính xác luồng ứng dụng
+
 const viewsPath = path.join(__dirname, '../views/html');
 
-// Trang Login
-app.get('/login', (req, res) => {
-    if (req.session.user) return res.redirect('/');
-    res.sendFile(path.join(viewsPath, 'login.html'));
-});
-
-// Trang Setup Nickname
-app.get('/setup-nickname', ensureLoggedIn, (req, res) => {
-    res.sendFile(path.join(viewsPath, 'setup-nickname.html'));
-});
-
-// Trang Admin (Load Dashboard)
-app.get('/admin', ensureLoggedIn, ensureAdmin, (req, res) => {
-    res.sendFile(path.join(viewsPath, 'admin-dashboard.html'));
-});
-
-// Trang Chat (Gốc)
+// --- Trang Chat (Main App) ---
 app.get('/chat', ensureLoggedIn, async (req, res) => {
     const user = req.session.user;
     
-    // Check nickname & info
-    if (!user?.nickname?.trim() || !user?.dateOfBirth || !user?.gender) {
+    // Nếu user chưa có nickname -> Đá về trang setup
+    // (Trang setup-nickname đã được xử lý trong authRoutes)
+    if (!user?.nickname?.trim() || user.nickname === "New User") {
         req.session.tempUserId = user._id.toString();
         return res.redirect('/setup-nickname');
     }
 
-    // Ghi Log Access
-    try { await AccessLog.logAccess(user._id); } catch(e) { console.error(e); }
+    // Ghi log truy cập
+    try { await AccessLog.logAccess(user._id); } catch(e) { console.error("Log Error:", e.message); }
     
     res.sendFile(path.join(viewsPath, 'chat.html'));
 });
 
-// Trang Chủ (Redirect Logic)
+// --- Trang Admin ---
+app.get('/admin', ensureLoggedIn, ensureAdmin, (req, res) => {
+    res.sendFile(path.join(viewsPath, 'admin-dashboard.html'));
+});
+
+// --- Trang Chủ (Điều hướng thông minh) ---
 app.get('/', (req, res) => {
     if (!req.session.user) {
         return res.redirect('/login');
     }
-    if (req.session.user.role === 'admin' || req.session.user.role === 'superadmin') {
+    // Nếu là admin -> vào dashboard
+    if (['admin', 'superadmin'].includes(req.session.user.role)) {
         return res.redirect('/admin');
     }
+    // User thường -> vào chat
     res.redirect('/chat');
 });
 
 // ====================================
-// 8️⃣ User API Helper
+// 8️⃣ Helper API
 // ====================================
+// API để frontend lấy thông tin user hiện tại (Dùng cho core.js)
 app.get('/api/me', ensureLoggedInJSON, (req, res) => {
-    const { _id, nickname, avatar, role } = req.session.user;
-    res.json({ _id, nickname, avatar, role });
+    const { _id, nickname, avatar, role, username } = req.session.user;
+    res.json({ _id, nickname, avatar, role, username });
 });
 
+// 404 Handler
+app.use((req, res) => {
+    res.status(404).send('<h1>404 - Not Found</h1>');
+});
+
+// Export cả app và sessionMiddleware để dùng bên server.js (Socket.IO)
 module.exports = { app, sessionMiddleware };

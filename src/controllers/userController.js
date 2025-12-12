@@ -124,14 +124,26 @@ exports.getUserProfile = async (req, res) => {
       return res.status(400).json({ error: 'ID không hợp lệ' });
 
     if (String(meId) === String(targetId)) {
-      const me = await User.findById(meId).select('_id nickname avatar');
+      const me = await User.findById(meId).select('_id nickname avatar isBanned');
       return res.json({ ...me.toObject(), status: 'self' });
     }
 
     const me = await User.findById(meId).select('friends');
-    const target = await User.findById(targetId).select('_id nickname avatar');
+    // 👇 THAY ĐỔI 1: Lấy cả trạng thái isBanned của người dùng mục tiêu
+    const target = await User.findById(targetId).select('_id nickname avatar isBanned online'); 
 
     if (!target) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+    
+    // 👇 THAY ĐỔI 2: Nếu tài khoản bị BAN, chặn hoặc trả về thông tin đã lọc
+    if (target.isBanned) {
+        return res.json({
+            _id: target._id,
+            nickname: 'Tài khoản bị khóa',
+            avatar: '/uploads/banned.png', 
+            status: 'banned', // Gắn cờ mới để Frontend chặn hành động
+            isBanned: true
+        });
+    }
 
     let status = 'none';
     if (me.friends.includes(target._id)) status = 'friend';

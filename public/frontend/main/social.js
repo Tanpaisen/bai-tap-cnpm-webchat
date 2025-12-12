@@ -1,5 +1,79 @@
 /* ================ SOCIAL NETWORK LOGIC ================ */
 
+// //====================Giữ liệu giả định ======================================================================================//
+
+// // 1. Tạo danh sách bạn bè giả (ID phải khớp với ID trong app.js để chat được)
+// const mockFriends = [
+//     {
+//         _id: "65f2d6c12345678912345678", // ID của Tester A
+//         nickname: "Tester A (User 1)",
+//         avatar: "https://ui-avatars.com/api/?name=User+A&background=random",
+//         status: "online"
+//     },
+//     {
+//         _id: "65f2d6c12345678912349999", // ID của Tester B
+//         nickname: "Tester B (User 2)",
+//         avatar: "https://ui-avatars.com/api/?name=User+B&background=0D8ABC&color=fff",
+//         status: "online"
+//     }
+// ];
+
+// // 2. Chạy khi trang web load xong
+// document.addEventListener('DOMContentLoaded', () => {
+//     console.log("🚀 Đang chạy chế độ Test Giao diện (Mock Data)");
+    
+//     // Gọi hàm vẽ danh sách
+//     renderFriendList(mockFriends);
+// });
+
+// // 3. Hàm vẽ danh sách ra HTML
+// function renderFriendList(friends) {
+//     // Render vào Tab Chat (dạng rút gọn)
+//     const chatList = document.getElementById('friend-list-chat');
+//     if (chatList) {
+//         chatList.innerHTML = friends.map(f => `
+//             <li onclick="selectChat('${f._id}', '${f.nickname}', '${f.avatar}')" class="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer flex items-center gap-3">
+//                 <img src="${f.avatar}" class="w-10 h-10 rounded-full object-cover">
+//                 <div>
+//                     <h4 class="text-sm font-bold text-gray-800 dark:text-white">${f.nickname}</h4>
+//                     <p class="text-xs text-gray-500">Tin nhắn mới...</p>
+//                 </div>
+//             </li>
+//         `).join('');
+//     }
+
+//     // Render vào Tab Bạn bè (dạng Grid đầy đủ)
+//     const friendGrid = document.getElementById('friend-list-friends');
+//     if (friendGrid) {
+//         friendGrid.innerHTML = friends.map(f => `
+//             <li class="bg-white dark:bg-brand-panel p-4 rounded-xl border border-gray-200 dark:border-brand-border flex flex-col items-center gap-3">
+//                 <img src="${f.avatar}" class="w-20 h-20 rounded-full object-cover">
+//                 <h4 class="font-bold text-gray-800 dark:text-white">${f.nickname}</h4>
+//                 <button onclick="selectChat('${f._id}', '${f.nickname}', '${f.avatar}')" class="w-full py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100">Nhắn tin</button>
+//             </li>
+//         `).join('');
+//     }
+// }
+
+// function selectChat(userId, nickname, avatar) {
+//     console.log(`💬 Click vào: ${nickname} (ID: ${userId})`);
+    
+//     // 👇 QUAN TRỌNG: Gọi hàm logic chính bên file chat.js
+//     if (window.startChatWith) {
+//         window.startChatWith(userId); 
+//     } else {
+//         console.error("❌ Lỗi: Không tìm thấy hàm window.startChatWith (Kiểm tra file chat.js đã load chưa)");
+//     }
+// }
+// function loadFriendList() {
+//     // Thay vì fetch('/api/friends'), ta dùng mockFriends luôn
+//     console.log("⚠️ Đang dùng dữ liệu bạn bè giả để test giao diện");
+//     renderFriendList(mockFriends); 
+// }
+// // Gọi hàm này khi trang web load xong
+// document.addEventListener('DOMContentLoaded', loadFriendList);
+//=========================================END MOCK=================================================================================================//
+
 window.loadFriends = async function(full = false) {
   try {
     const friends = await window.tryFetchJson(["/api/friends"]);

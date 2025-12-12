@@ -3,6 +3,30 @@ const router = express.Router();
 const { ensureLoggedInJSON } = require('../middleware/auth');
 const chatController = require('../controllers/chatController');
 
+
+//=====================TEST MOCK====================//
+// router.get('/chats', (req, res) => {
+//     res.json([]); // Trả về mảng rỗng
+// });
+// // ✅ Mock API: Lấy lịch sử tin nhắn
+// router.get('/history', (req, res) => {
+//     res.json([]); // Trả về mảng rỗng (chưa có tin nhắn cũ)
+// });
+// // ✅ API Gửi tin nhắn (Giả lập trả về tin nhắn vừa gửi)
+// router.post('/send', (req, res) => {
+//     const { text, roomId, receiver } = req.body;
+//     // Trả về đúng format tin nhắn để frontend vẽ ra
+//     res.json({
+//         _id: "msg_" + Date.now(),
+//         sender: req.session.user._id, // ID của người đang login giả
+//         receiver: receiver,
+//         content: text,
+//         type: 'text',
+//         roomId: roomId,
+//         createdAt: new Date()
+//     });
+// });
+//=====================END TEST MOCK====================//
 // 1. Lấy danh sách chat
 router.get('/chats', ensureLoggedInJSON, chatController.getChatList);
 
