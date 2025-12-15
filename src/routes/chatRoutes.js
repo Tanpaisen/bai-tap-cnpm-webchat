@@ -55,6 +55,6 @@ router.post('/group/delete', ensureLoggedInJSON, chatController.deleteGroup);
 router.post('/group/remove-member', ensureLoggedInJSON, chatController.removeMemberFromGroup);
 
 // 10. Đặt biệt danh
-// router.post('/group/rename-member', ensureLoggedInJSON, chatController.renameMemberFromGroup);
+router.post('/group/set-nickname', ensureLoggedInJSON, chatController.setMemberNickname);
 
 module.exports = router;

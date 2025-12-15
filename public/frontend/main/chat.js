@@ -152,7 +152,7 @@ window.startChatWith = async function (targetId) {
       updateHeaderUI("Người dùng", "", false);
     }
   } // ✅ 4. MỞ GIAO DIỆN CHAT (FIX LỖI)
-
+const myId = window.MINE_ID ? window.MINE_ID.toString() : ''; // Đảm bảo ID của mình là chuỗi
   const msgsContainer = document.getElementById("messages");
   if (msgsContainer) msgsContainer.innerHTML = ""; // Gọi hàm bật màn hình chat
 
@@ -174,44 +174,40 @@ window.loadHistory = async function (prepend = false) {
     if (!window.limit) window.limit = 20;
     if (typeof window.skip === "undefined") window.skip = 0;
 
+    // Quan trọng: Gửi roomId thay vì user1/user2 để hỗ trợ cả nhóm
     const url = `/api/chat/history?roomId=${window.currentRoomId}&limit=${window.limit}&skip=${window.skip}`;
-    const msgs = await window.tryFetchJson([url]); // Nếu API trả về lỗi hoặc rỗng
+    const msgs = await window.tryFetchJson([url]);
 
-    if (!Array.isArray(msgs)) return;
+    if (!Array.isArray(msgs) || !msgs.length) return;
 
     const list = msgs.reverse();
     const container = document.createDocumentFragment();
     let lastDate = null;
-
     for (const m of list) {
       // Xử lý ngày tháng (nếu có hàm createDateSeparator)
       const dstr = new Date(m.createdAt).toLocaleDateString("vi-VN");
       if (window.createDateSeparator && dstr !== lastDate) {
-        lastDate = dstr;
-        container.appendChild(window.createDateSeparator(dstr));
-      }
+      lastDate = dstr;
+      container.appendChild(window.createDateSeparator(dstr));
+ }
 
-      if (window.renderedMessageIds.has(m._id)) continue;
-      window.renderedMessageIds.add(m._id);
+ if (window.renderedMessageIds.has(m._id)) continue;
+ window.renderedMessageIds.add(m._id);
+ const isSelf = (m.sender._id || m.sender) === window.MINE_ID;
+ container.appendChild(window.buildMessageNode(m, isSelf));
+ }
 
-      const isSelf = (m.sender._id || m.sender) === window.MINE_ID; // Tạo bong bóng chat (Ưu tiên dùng window.buildMessageNode nếu có)
+ const msgEl = document.getElementById("messages");
+ if (prepend) msgEl.prepend(container);
+ else {
+ msgEl.appendChild(container);
+ msgEl.scrollTop = msgEl.scrollHeight;
+ }
+ window.skip += msgs.length;
 
-      const msgNode = window.buildMessageNode
-        ? window.buildMessageNode(m, isSelf)
-        : createSimpleMessageNode(m, isSelf);
-      container.appendChild(msgNode);
-    }
-
-    const msgEl = document.getElementById("messages");
-    if (prepend) msgEl.prepend(container);
-    else {
-      msgEl.appendChild(container);
-      msgEl.scrollTop = msgEl.scrollHeight;
-    }
-    window.skip += msgs.length;
-  } catch (e) {
-    console.error("Lỗi load history:", e);
-  }
+ } catch (e) {
+ console.error("Lỗi load history:", e);
+ }
 };
 
 // Hàm dự phòng tạo bong bóng chat đơn giản
@@ -315,103 +311,86 @@ window.sendMessage = async function () {
   }
 };
 
-window.loadChatList = async function (force = false) {
-  if (window.ALL_CHATS && window.ALL_CHATS.length && !force) return;
-  try {
-    const chats = await window.tryFetchJson(["/api/chat/chats"]);
-    window.ALL_CHATS = Array.isArray(chats) ? chats : [];
+async function loadChatList(force = false) {
+  if (window.ALL_CHATS.length && !force) return;
+  try {
+    // 1. Load chats
+    const chats = await window.tryFetchJson(["/api/chat/chats"]);
+    window.ALL_CHATS = Array.isArray(chats) ? chats : [];
 
-    const friends = await window.tryFetchJson(["/api/friends"]);
-    window.ALL_FRIENDS = Array.isArray(friends) ? friends : friends.data || [];
+    // 2. Load friends
+    const friends = await window.tryFetchJson(["/api/friends"]);
+    window.ALL_FRIENDS = Array.isArray(friends) ? friends : [];
 
-    const existingChatIds = new Set(
-      window.ALL_CHATS.map((c) => c.partnerId || c._id)
-    );
-    const friendsNotInChat = window.ALL_FRIENDS.filter(
-      (f) => !existingChatIds.has(f._id || f.id)
-    ).map((f) => ({
-      _id: f._id || f.id,
-      partnerId: f._id || f.id,
-      nickname: f.nickname,
-      avatar: f.avatar,
-      online: f.online,
-      isGroup: false,
-    }));
+    // 3. Gộp danh sách (Chat + Bạn bè chưa chat)
+    const existingChatIds = new Set(
+      window.ALL_CHATS.map((c) => c.partnerId || c._id)
+    );
+    const friendsNotInChat = window.ALL_FRIENDS.filter(
+   (f) => !existingChatIds.has(f._id || f.id) && !f.isBanned
+    ).map((f) => ({
+      _id: f._id || f.id,
+      partnerId: f._id || f.id,
+      nickname: f.nickname,
+      avatar: f.avatar,
+      online: f.online,
+      isGroup: false,
+    }));
 
-    const combinedList = [...window.ALL_CHATS, ...friendsNotInChat];
-    combinedList.sort((a, b) => {
-      const tA = a.lastMessage
-        ? new Date(a.lastMessage.createdAt)
-        : new Date(0);
-      const tB = b.lastMessage
-        ? new Date(b.lastMessage.createdAt)
-        : new Date(0);
-      return tB - tA;
-    });
+    const combinedList = [...window.ALL_CHATS, ...friendsNotInChat];
+    // Sort theo tin nhắn mới nhất
+    combinedList.sort((a, b) => {
+      const tA = a.lastMessage
+        ? new Date(a.lastMessage.createdAt)
+        : new Date(0);
+      const tB = b.lastMessage
+        ? new Date(b.lastMessage.createdAt)
+        : new Date(0);
+      return tB - tA;
+    });
 
-    // RENDER LIST (Vào đúng ID friend-list-chat)
-    const listContainer = document.getElementById("friend-list-chat");
-    if (listContainer) {
-      listContainer.innerHTML = combinedList
-        .map((c) => {
-          // Gán cờ isBanned (Lấy từ Backend)
-          const isBanned = c.isDeleted || false;
+    window.displayChats(
+      combinedList,
+      document.getElementById("friend-list-chat")
+    );
 
-          // 1. Logic ẩn hẳn:
-          if (isBanned && !c.lastMessage) return ""; // Nếu bị xóa và không có tin nhắn gần đây thì ẩn luôn
+    // 4. Render List Nhóm riêng
+    const groups = window.ALL_CHATS.filter((c) => c.isGroup);
 
-          // 2. Logic hiển thị
-          const name = isBanned
-            ? "Deleted"
-            : c.groupName || c.nickname || "User";
-          const statusClass = isBanned ? "text-red-500" : "text-gray-500";
-          const avatar = isBanned ? "/uploads/banned.png" : window.getAvatar(c);
+    const groupSidebarList = document.getElementById("group-list");
+    if (groupSidebarList) {
+      groupSidebarList.innerHTML = groups.length
+        ? ""
+        : '<li class="text-center text-xs text-gray-500 mt-4">Chưa tham gia nhóm nào</li>';
+      groups.forEach((g) =>
+        groupSidebarList.insertAdjacentHTML(
+          "beforeend",
+          window.createChatItemHTML(g)
+        )
+      );
+    }
 
-          return `
-        <li class="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer flex items-center gap-3 ${
-          isBanned ? "opacity-50 pointer-events-none" : ""
-        }" 
-            onclick="window.startChatWith('${c._id || c.partnerId}')">
-            
-            <img src="${avatar}" class="w-12 h-12 rounded-full object-cover">
-            
-            <div class="flex-1 min-w-0">
-                <h4 class="text-sm font-bold ${statusClass} truncate">${name}</h4>
-                <p class="text-xs ${statusClass} truncate">${
-            isBanned ? "Tài khoản đã bị xóa" : "Tin nhắn mới..."
-          }</p>
-            </div>
-        </li>
-    `;
-        })
-        .join("");
-    }
+    const groupGrid = document.getElementById("group-grid-list");
+    if (groupGrid) {
+      groupGrid.innerHTML = groups.length
+        ? ""
+        : '<div class="col-span-full text-center text-gray-500 mt-10">Chưa tham gia nhóm nào</div>';
+      groups.forEach((g) => {
+        const html = `<li class="bg-white dark:bg-brand-panel border border-gray-200 dark:border-brand-border p-4 rounded-2xl flex flex-col items-center gap-3 hover:border-brand-purple transition-all shadow-sm cursor-pointer" onclick="window.startChatWith('${
+          g._id
+        }')"><img src="${window.getAvatar(
+          g
+        )}" class="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-zinc-800"><div class="text-center"><h4 class="font-bold text-gray-800 dark:text-white truncate max-w-[150px]">${
+          g.nickname
+        }</h4><span class="text-xs text-gray-500 dark:text-zinc-500">Thành viên: ${
+          g.members ? g.members.length : "?"
+        }</span></div></li>`;
+        groupGrid.insertAdjacentHTML("beforeend", html);
+      });
+    }
+  } catch (e) {}
+}
 
-    // Render Group Sidebar
-    const groups = window.ALL_CHATS.filter((c) => c.isGroup);
-    const groupSidebarList = document.getElementById("group-list");
-    if (groupSidebarList) {
-      groupSidebarList.innerHTML = groups.length
-        ? ""
-        : '<li class="text-center text-xs text-gray-500 mt-4">Chưa tham gia nhóm nào</li>';
-      groups.forEach((g) => {
-        const html = `<li onclick="window.startChatWith('${
-          g._id
-        }')" class="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer flex items-center gap-3">
-                <img src="${window.getAvatar(
-                  g
-                )}" class="w-10 h-10 rounded-full object-cover">
-                <span class="text-sm font-medium text-gray-800 dark:text-white truncate">${
-                  g.name
-                }</span>
-             </li>`;
-        groupSidebarList.insertAdjacentHTML("beforeend", html);
-      });
-    }
-  } catch (e) {
-    console.error("Lỗi loadChatList:", e);
-  }
-};
 
 window.setupInputEvents = function () {
   const input = document.getElementById("message-input");
@@ -483,7 +462,7 @@ window.handleTypingInput = function () {
       roomId: window.currentRoomId,
       to: window.currentChatTo,
     });
-  }, 1000);
+  }, 3000);
 };
 
 window.setupChatHeaderEvents = function () {
@@ -582,72 +561,115 @@ window.handleUserProfile = async function (userId) {
   }
 };
 
+/* ================ PROFILE GROUP  ================ */
+
 window.handleGroupProfile = async function (groupId) {
   const chatProfile = document.getElementById("chat-profile");
   if (!chatProfile) return;
   try {
     const group = await window.tryFetchJson([`/api/chat/group/${groupId}`]);
     if (group) {
+      // 1. Render thông tin cơ bản
       document.getElementById("profile-name").textContent = group.name;
       document.getElementById("profile-avatar-preview").src =
         group.avatar || "https://cdn-icons-png.flaticon.com/512/166/166258.png";
 
-      const avatarContainer = document.getElementById(
-        "profile-avatar-preview"
-      ).parentElement;
-      const oldDots = avatarContainer.querySelectorAll("div");
+      // Xóa indicator online cũ
+      const avatarContainer = document.getElementById("profile-avatar-preview").parentElement;
+      const oldDots = avatarContainer.querySelectorAll(".online-indicator");
       oldDots.forEach((dot) => dot.remove());
 
       const actionsContainer = document.getElementById("profile-actions");
-      let membersHTML = `<div class="w-full text-left mt-4"><h4 class="text-xs font-bold text-zinc-500 uppercase mb-2">Thành viên (${group.members.length})</h4><ul class="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">`;
+      let membersHTML = `<div class="w-full text-left mt-4"><h4 class="text-xs font-bold text-zinc-500 uppercase mb-2">Thành viên (${group.members.length})</h4><ul class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">`;
+
+      // 2. Render Danh sách thành viên (Kèm Biệt danh)
+      const nicknames = group.memberNicknames || {};
 
       group.members.forEach((m) => {
         const isAdmin = m._id === group.admin;
+        const memberIdStr = m._id.toString();
+        
+        // Logic hiển thị tên: Ưu tiên biệt danh
+        const realName = m.nickname || m.username;
+        const displayNick = nicknames[memberIdStr] || realName;
+        const isNicknamed = !!nicknames[memberIdStr];
+
         const adminBadge = isAdmin
           ? '<i class="fa-solid fa-crown text-yellow-500 ml-2 text-xs" title="Chủ phòng"></i>'
           : "";
+        
+        // Nút Xóa thành viên (Chỉ Admin thấy & không xóa chính mình)
         let removeAction = "";
         if (group.admin === window.MINE_ID && m._id !== window.MINE_ID) {
-          removeAction = `<button onclick="window.removeMemberFromGroup('${group._id}', '${m._id}')" class="ml-2 text-gray-400 hover:text-red-500 p-1 rounded hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors" title="Xóa khỏi nhóm"><i class="fa-solid fa-xmark text-xs"></i></button>`;
+          removeAction = `<button onclick="window.removeMemberFromGroup('${group._id}', '${m._id}')" class="ml-1 text-gray-400 hover:text-red-500 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Xóa khỏi nhóm"><i class="fa-solid fa-xmark"></i></button>`;
         }
-        membersHTML += `<li class="flex items-center gap-2 p-2 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"><img src="${window.getAvatar(
-          m
-        )}" class="w-8 h-8 rounded-full object-cover"><span class="text-sm text-gray-800 dark:text-white truncate flex-1">${
-          m.nickname || m.username
-        } ${adminBadge}</span>${removeAction}</li>`;
+
+        // Nút Sửa biệt danh (Ai cũng thấy)
+        const editNickAction = `<button onclick="window.openSetNicknameModal('${group._id}', '${m._id}', '${displayNick.replace(/'/g, "\\'")}')" class="ml-1 text-gray-400 hover:text-blue-500 p-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Đặt biệt danh"><i class="fa-solid fa-pen"></i></button>`;
+
+        membersHTML += `
+            <li class="flex items-center gap-2 p-2 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 group">
+                <img src="${window.getAvatar(m)}" class="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-zinc-700">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-1">
+                        <span class="text-sm font-medium text-gray-800 dark:text-white truncate ${isNicknamed ? 'text-brand-purple' : ''}">
+                            ${displayNick}
+                        </span>
+                        ${adminBadge}
+                    </div>
+                    ${isNicknamed ? `<p class="text-[10px] text-gray-400 truncate">Tên thật: ${realName}</p>` : ''}
+                </div>
+                <div class="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    ${editNickAction}
+                    ${removeAction}
+                </div>
+            </li>`;
       });
       membersHTML += `</ul></div>`;
 
+      // 3. Render Nút Giải Tán (Chỉ Admin)
       let deleteBtnHTML = "";
       if (group.admin === window.MINE_ID) {
         deleteBtnHTML = `<button id="group-delete-btn" class="w-full py-3 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-500 dark:text-red-400 rounded-xl text-sm font-medium border border-red-200 dark:border-red-500/20 flex items-center justify-center gap-2 transition-colors mt-2"><i class="fa-solid fa-trash-can"></i> Giải tán nhóm</button>`;
       } else {
-        deleteBtnHTML = `<button class="w-full py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 rounded-xl text-sm font-medium border border-zinc-200 dark:border-zinc-700 flex items-center justify-center gap-2 cursor-not-allowed mt-2" title="Chỉ trưởng nhóm mới được xóa"><i class="fa-solid fa-user-shield"></i> Chỉ trưởng nhóm xóa được</button>`;
+        // Nếu không phải admin, hiện nút "Rời nhóm" (để sau) hoặc nút disabled
+        deleteBtnHTML = `<button class="w-full py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 rounded-xl text-sm font-medium border border-zinc-200 dark:border-zinc-700 flex items-center justify-center gap-2 cursor-not-allowed mt-2"><i class="fa-solid fa-lock"></i> Chỉ trưởng nhóm mới xóa được</button>`;
       }
-      actionsContainer.innerHTML = ` <button id="group-rename-btn" class="w-full py-3 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-white rounded-xl text-sm font-medium border border-gray-300 dark:border-zinc-700 flex items-center justify-center gap-2 transition-colors mb-2"><i class="fa-solid fa-pen"></i> Đổi tên nhóm</button> <button id="group-add-member-btn" class="w-full py-3 bg-blue-50 dark:bg-brand-purple/10 hover:bg-blue-100 dark:hover:bg-brand-purple/20 text-blue-600 dark:text-brand-purple rounded-xl text-sm font-medium border border-blue-200 dark:border-brand-purple/30 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-user-plus"></i> Thêm thành viên</button> ${deleteBtnHTML} ${membersHTML} `;
+
+      actionsContainer.innerHTML = ` 
+        <button id="group-rename-btn" class="w-full py-3 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 text-gray-800 dark:text-white rounded-xl text-sm font-medium border border-gray-300 dark:border-zinc-700 flex items-center justify-center gap-2 transition-colors mb-2"><i class="fa-solid fa-pen"></i> Đổi tên nhóm</button> 
+        <button id="group-add-member-btn" class="w-full py-3 bg-blue-50 dark:bg-brand-purple/10 hover:bg-blue-100 dark:hover:bg-brand-purple/20 text-blue-600 dark:text-brand-purple rounded-xl text-sm font-medium border border-blue-200 dark:border-brand-purple/30 flex items-center justify-center gap-2 transition-colors"><i class="fa-solid fa-user-plus"></i> Thêm thành viên</button> 
+        ${deleteBtnHTML} 
+        ${membersHTML} 
+      `;
+
+      // 4. Gán sự kiện Click
+      
+      // -- Đổi tên
       document.getElementById("group-rename-btn").onclick = async () => {
-        const newName = prompt("Nhập tên nhóm mới:", group.name);
-        if (newName && newName !== group.name) {
-          await fetch("/api/chat/group/rename", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ groupId, newName }),
-          });
-          window.loadChatList(true);
-          window.handleGroupProfile(groupId);
-          document.getElementById("chat-name").textContent = newName;
-        }
+         const newName = prompt("Nhập tên nhóm mới:", group.name);
+         if (newName && newName !== group.name) {
+             await fetch("/api/chat/group/rename", {
+                 method: "POST", headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify({ groupId, newName }),
+             });
+             window.loadChatList(true);
+             window.handleGroupProfile(groupId);
+             document.getElementById("chat-name").textContent = newName;
+         }
       };
+
+      // -- Thêm thành viên
       document.getElementById("group-add-member-btn").onclick = () => {
-        window.currentAddingGroupId = groupId;
-        document.getElementById("add-member-modal").style.display = "flex";
-        window.loadFriendsForGroupAdd();
+         window.currentAddingGroupId = groupId;
+         document.getElementById("add-member-modal").style.display = "flex";
+         window.loadFriendsForGroupAdd();
       };
+
+      // -- 🚨 QUAN TRỌNG: Giải tán nhóm (Logic đã được khôi phục)
       if (document.getElementById("group-delete-btn")) {
         document.getElementById("group-delete-btn").onclick = async () => {
-          if (
-            confirm(`CẢNH BÁO: Bạn có chắc muốn giải tán nhóm "${group.name}"?`)
-          ) {
+          if (confirm(`CẢNH BÁO: Bạn có chắc muốn giải tán nhóm "${group.name}"?\nHành động này sẽ xóa toàn bộ tin nhắn và không thể hoàn tác.`)) {
             try {
               const res = await fetch("/api/chat/group/delete", {
                 method: "POST",
@@ -656,30 +678,60 @@ window.handleGroupProfile = async function (groupId) {
               });
               const data = await res.json();
               if (data.success) {
-                alert("Đã giải tán nhóm.");
-                document.getElementById("chat-profile").style.width = "0px";
-                document
-                  .getElementById("chat-profile")
-                  .classList.remove("border-l");
+                alert("Đã giải tán nhóm thành công.");
+                
+                // Đóng sidebar profile
+                chatProfile.style.width = "0px";
+                chatProfile.classList.remove("border-l");
+                
+                // Reset trạng thái chat
                 window.currentChatTo = null;
+                window.currentRoomId = null;
                 window.showMainSection("section-welcome");
+                
+                // Tải lại danh sách
                 await window.loadChatList(true);
               } else {
-                alert(data.error);
+                alert(data.error || "Không thể giải tán nhóm");
               }
             } catch (err) {
+              console.error(err);
               alert("Lỗi kết nối server");
             }
           }
         };
       }
 
-      chatProfile.style.width = "300px";
+      chatProfile.style.width = "320px";
       chatProfile.classList.add("border-l");
     }
   } catch (e) {
     console.error("Lỗi profile group:", e);
   }
+};
+
+// 2. Hàm Mở Modal Đặt Biệt Danh (CÓ KÈM GẮN LẠI SỰ KIỆN)
+window.openSetNicknameModal = function(groupId, memberId, currentNickname) {
+    const modal = document.getElementById('set-nickname-modal');
+    const input = document.getElementById('new-nickname-input');
+    const confirmBtn = document.getElementById('confirm-set-nickname-btn'); // Lấy nút xác nhận
+
+    document.getElementById('nickname-target-group-id').value = groupId;
+    document.getElementById('nickname-target-member-id').value = memberId;
+    document.getElementById('nickname-modal-subtitle').textContent = `Đặt biệt danh cho: ${currentNickname}`;
+    
+    input.value = ""; 
+    
+    // 🚨 BƯỚC FIX QUAN TRỌNG: Gắn sự kiện lại (hoặc đảm bảo nó đã được gắn)
+    if (confirmBtn) {
+        // Xóa sự kiện cũ (Nếu có)
+        confirmBtn.onclick = null; 
+        // Gắn sự kiện mới
+        confirmBtn.onclick = window.submitSetNickname;
+    }
+
+    modal.style.display = 'flex';
+    setTimeout(() => input.focus(), 100);
 };
 
 window.removeMemberFromGroup = async function (groupId, memberId) {
@@ -728,6 +780,7 @@ window.openCreateGroupModal = async function () {
           '<p class="text-center text-gray-500 dark:text-zinc-500 text-sm py-4">Bạn chưa có bạn bè nào.</p>';
       } else {
         window.ALL_FRIENDS.forEach((f) => {
+          if (f.isBanned) return;
           const isChecked =
             window.targetGroupMemberId === (f._id || f.id) ? "checked" : "";
           const html = `<label class="flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer transition-colors select-none border-b border-gray-100 dark:border-zinc-800/50 last:border-0"><div class="flex items-center gap-3"><img src="${window.getAvatar(
@@ -879,6 +932,8 @@ window.confirmAddMember = async function (memberId) {
     alert("Lỗi server");
   }
 };
+
+
 // Khởi chạy khi file load
 document.addEventListener("DOMContentLoaded", () => {
   if (!window.ALL_CHATS) window.ALL_CHATS = [];
@@ -887,4 +942,29 @@ document.addEventListener("DOMContentLoaded", () => {
   if (window.setupInputEvents) window.setupInputEvents();
   if (window.setupChatHeaderEvents) window.setupChatHeaderEvents();
   if (window.loadChatList) window.loadChatList();
+  if (window.setupRealtimeChatListUpdate) window.setupRealtimeChatListUpdate();
 });
+
+// ✅ HÀM LẮNG NGHE SỰ KIỆN CẬP NHẬT TỪ SOCKET
+window.setupRealtimeChatListUpdate = function() {
+    if (!window.socket) return;
+
+    window.socket.on('friendStatusUpdate', async (data) => {
+        if (data.action === 'accepted') {
+            console.log(`🔔 [Socket] Kết bạn thành công với ${data.partnerId}. Đang tải lại list chat/friend.`);
+            
+            // 1. Load lại danh sách bạn bè (Cần thiết cho social.js)
+            if (window.loadFriends) await window.loadFriends(true); 
+            
+            // 2. Load lại danh sách chat (Cần thiết để tạo Chat box mới trên Sidebar)
+            await window.loadChatList(true); // Dùng force=true để tải lại từ API
+            
+            // 3. Nếu đang ở màn hình Lời mời kết bạn, hiển thị thông báo
+            const reqSection = document.getElementById('section-requests');
+            if (reqSection && reqSection.style.display === 'flex') {
+                 alert('Lời mời đã được chấp nhận. Chat mới đã được thêm vào mục Đoạn chat.');
+            }
+        }
+    });
+};
+

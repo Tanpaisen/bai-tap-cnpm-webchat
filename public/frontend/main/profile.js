@@ -60,7 +60,94 @@ window.setupSettingsEvents = function() {
     if (targetContent) targetContent.classList.add("active");
 
     if (menu === "security") window.loadProfile();
+
+    // ✅ LOGIC MỚI: Load danh sách chat khi bấm tab "Tin nhắn"
+    if (menu === "messages") {
+        const selectEl = document.getElementById("chat-list-for-deletion");
+        const deleteBtn = document.getElementById("delete-history-btn");
+        if (selectEl && deleteBtn) {
+            selectEl.innerHTML = '<option value="">-- Chọn cuộc trò chuyện --</option>';
+            deleteBtn.disabled = true;
+            deleteBtn.classList.add("opacity-50", "cursor-not-allowed");
+
+            if (window.ALL_CHATS && window.ALL_CHATS.length > 0) {
+                window.ALL_CHATS.forEach(chat => {
+                    const option = document.createElement("option");
+                    option.value = chat._id;
+                    let displayName = "Không tên";
+                    if (chat.isGroup) {
+                        displayName = `[Nhóm] ${chat.name}`;
+                    } else {
+                        displayName = chat.nickname || chat.username || "Người dùng";
+                    }
+                    option.textContent = displayName;
+                    selectEl.appendChild(option);
+                });
+            } else {
+                selectEl.innerHTML = '<option value="">Không có cuộc trò chuyện nào</option>';
+            }
+        }
+    }
   });
+
+  // ✅ LOGIC MỚI: Xử lý nút Xóa Chat (Sự kiện Change & Click)
+  const deleteSelect = document.getElementById("chat-list-for-deletion");
+  const deleteBtn = document.getElementById("delete-history-btn");
+
+  if (deleteSelect && deleteBtn) {
+      deleteSelect.addEventListener("change", () => {
+          if (deleteSelect.value) {
+              deleteBtn.disabled = false;
+              deleteBtn.classList.remove("opacity-50", "cursor-not-allowed");
+          } else {
+              deleteBtn.disabled = true;
+              deleteBtn.classList.add("opacity-50", "cursor-not-allowed");
+          }
+      });
+
+      deleteBtn.addEventListener("click", async () => {
+          const chatId = deleteSelect.value;
+          const chatName = deleteSelect.options[deleteSelect.selectedIndex].text;
+          if (!chatId) return;
+
+          if (confirm(`⚠️ CẢNH BÁO: Bạn có chắc muốn xóa vĩnh viễn cuộc trò chuyện "${chatName}"?\nHành động này không thể hoàn tác!`)) {
+              try {
+                  // Gọi API xóa (Route đã chuyển sang friendController)
+                  const res = await fetch("/api/friends/delete", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ chatId }),
+                  });
+                  const data = await res.json();
+
+                  if (data.success) {
+                      alert("✅ Đã xóa cuộc trò chuyện thành công.");
+                      
+                      // Cập nhật UI Dropdown
+                      deleteSelect.remove(deleteSelect.selectedIndex);
+                      deleteSelect.value = "";
+                      deleteBtn.disabled = true;
+                      deleteBtn.classList.add("opacity-50", "cursor-not-allowed");
+
+                      // Cập nhật Sidebar Chat
+                      if (window.loadChatList) await window.loadChatList(true);
+
+                      // Nếu đang mở chat bị xóa, quay về welcome
+                      if (window.currentRoomId === chatId) {
+                          if (window.toggleChatScreen) window.toggleChatScreen(false);
+                          window.currentRoomId = null;
+                          window.currentChatTo = null;
+                      }
+                  } else {
+                      alert(data.error || "Lỗi khi xóa");
+                  }
+              } catch (e) {
+                  console.error(e);
+                  alert("Lỗi kết nối server");
+              }
+          }
+      });
+  }
 
   // Toggle Online/Offline
   const statusToggle = document.getElementById("incoming-status-toggle");

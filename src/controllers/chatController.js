@@ -151,7 +151,7 @@ getChatList: async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(parseInt(skip))
         .limit(parseInt(limit))
-        .populate("sender", "username nickname avatar")
+        .populate("sender", "_id username nickname avatar isBanned")
         .lean(); // Nếu là nhóm chat, áp dụng biệt danh cho người gửi
 
       if (chat.isGroup) {
@@ -278,17 +278,57 @@ getChatList: async (req, res) => {
     } catch (err) {
       res.status(500).json({ error: "Lỗi server" });
     }
-  }, // 7. ĐỔI TÊN NHÓM
+  }, 
 
+ // 7. ĐỔI TÊN NHÓM (CÓ THÔNG BÁO)
   renameGroup: async (req, res) => {
     try {
       const { groupId, newName } = req.body;
-      await Chat.findByIdAndUpdate(groupId, { name: newName });
+      const userId = req.session.user._id;
+
+      if (!newName || newName.trim().length === 0) {
+        return res.status(400).json({ error: "Tên nhóm không được để trống" });
+      }
+
+      // 1. Cập nhật tên nhóm
+      const chat = await Chat.findByIdAndUpdate(groupId, { name: newName });
+      if (!chat) return res.status(404).json({ error: "Nhóm không tồn tại" });
+
+      // 2. Lấy thông tin người đổi để tạo thông báo
+      const actor = await User.findById(userId);
+      const actorName = actor ? (actor.nickname || actor.username) : "Một thành viên";
+
+      // 3. Tạo tin nhắn hệ thống
+      const sysMsg = new Message({
+        chat: groupId,
+        sender: userId,
+        content: `đã đổi tên nhóm thành "${newName}"`,
+        type: "system",
+      });
+      await sysMsg.save();
+
+      // 4. Cập nhật tin nhắn cuối cùng cho nhóm
+      await Chat.findByIdAndUpdate(groupId, { lastMessage: sysMsg._id });
+
+      // 5. Gửi Socket Real-time (Quan trọng)
+      const io = req.app.get("io");
+      if (io) {
+        // Populate để hiển thị avatar/tên người gửi tin nhắn hệ thống
+        await sysMsg.populate("sender", "username nickname avatar");
+        
+        // Bắn sự kiện có tin nhắn mới
+        io.to(groupId).emit("newMessage", sysMsg);
+        
+        // Bắn sự kiện riêng để Frontend cập nhật ngay cái tên trên Header và Sidebar
+        io.to(groupId).emit("groupRenamed", { groupId, newName }); 
+      }
+
       res.json({ success: true });
     } catch (err) {
+      console.error("Rename Group Error:", err);
       res.status(500).json({ error: "Lỗi server" });
     }
-  }, // 8. XÓA NHÓM
+  },// 8. XÓA NHÓM
 
   deleteGroup: async (req, res) => {
     try {
@@ -419,10 +459,10 @@ getChatList: async (req, res) => {
         // Thông báo đặt biệt danh mới
         if (memberId === callerId.toString()) {
           // Người đặt biệt danh cho chính mình
-          content = `${callerName} đã tự đặt biệt danh trong nhóm là **"${trimmedNickname}"**`;
+          content = `${callerName} đã tự đặt biệt danh trong nhóm là "${trimmedNickname}"`;
         } else {
           // Người đặt biệt danh cho người khác
-          content = `${callerName} đã đặt biệt danh cho ${targetUserCurrentName} là **"${trimmedNickname}"**`;
+          content = `${callerName} đã đặt biệt danh cho ${targetUserCurrentName} là "${trimmedNickname}"`;
         }
       } // 3. Tạo tin nhắn hệ thống & Cập nhật lastMessage
       const sysMsg = new Message({
@@ -433,6 +473,15 @@ getChatList: async (req, res) => {
       });
       await sysMsg.save();
       await Chat.findByIdAndUpdate(groupId, { lastMessage: sysMsg._id });
+      // Gửi Socket cho cả nhóm
+      // 1. Populate thông tin người gửi để hiển thị avatar/tên đúng
+      await sysMsg.populate("sender", "username nickname avatar");
+
+      // 2. Lấy IO và bắn tin nhắn
+      const io = req.app.get("io"); // Đảm bảo app.js đã set('io', io)
+      if (io) {
+          io.to(groupId).emit("newMessage", sysMsg);
+      }
       res.json({ success: true, newNickname: trimmedNickname });
     } catch (err) {
       console.error("Set Nickname Error:", err);

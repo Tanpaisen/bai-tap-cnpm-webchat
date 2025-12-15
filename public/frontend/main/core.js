@@ -104,7 +104,7 @@ window.loadSessionUser = async function() {
 
     if (!user.nickname?.trim()) return (location.href = "/setup-nickname");
 
-    window.MINE_ID = user._id;
+    window.MINE_ID = user._id.toString();
 
     const profileAvatar = document.getElementById("profile-avatar");
     if (profileAvatar) profileAvatar.src = window.getAvatar(user);
@@ -176,12 +176,12 @@ window.setupSocketEvents = function() {
 
   // Sự kiện Typing (Logic hiển thị UI)
   window.socket.on("typing", (data) => {
-    if (data.roomId === window.currentRoomId && data.from !== window.MINE_ID) {
+    if (data.roomId === window.currentRoomId && data.from !== window.MINE_ID.toString()) {
       const ind = document.getElementById("typing-indicator-container");
       if (ind) {
         ind.style.display = "flex";
         clearTimeout(window.roomTypingTimers[data.roomId]);
-        window.roomTypingTimers[data.roomId] = setTimeout(() => (ind.style.display = "none"), 3000);
+        window.roomTypingTimers[data.roomId] = setTimeout(() => (ind.style.display = "none"), 10000);
         document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
       }
     }
@@ -248,6 +248,23 @@ window.setupSocketEvents = function() {
             avatarContainer.appendChild(dot);
         }
     }
+
+    // Gửi thông báo đổi tên nhóm
+  window.socket.on("groupRenamed", (data) => {
+      const { groupId, newName } = data;
+
+      // 1. Nếu đang mở đúng nhóm đó thì đổi tên trên Header ngay
+      if (window.currentRoomId === groupId) {
+          const nameEl = document.getElementById("chat-name");
+          const profileNameEl = document.getElementById("profile-name");
+          
+          if (nameEl) nameEl.textContent = newName;
+          if (profileNameEl) profileNameEl.textContent = newName;
+      }
+
+      // 2. Cập nhật danh sách bên trái (Sidebar)
+      window.loadChatList(false); // false = không cần loading spinner
+  });
 
     // 4. Render lại list chat
     if (document.getElementById("friend-list-chat") && window.displayChats)

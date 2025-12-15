@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const FriendRequest = require('../models/FriendRequest');
+const socketManager = require('../socket/socketManager');
+const Chat = require('../models/Chat');
+const Message = require('../models/Message');
 
 const friendController = {
   // 1. Lấy danh sách bạn bè
@@ -55,7 +58,7 @@ const friendController = {
           _id: { $nin: excludeIds }, 
           role: { $ne: 'admin' } 
       })
-      .select('_id nickname avatar username')
+      .select('_id nickname avatar username isBanned')
       .limit(50)
       .lean();
 
@@ -194,6 +197,25 @@ const friendController = {
         await User.findByIdAndUpdate(reqDoc.from, { $addToSet: { friends: reqDoc.to } });
         await User.findByIdAndUpdate(reqDoc.to, { $addToSet: { friends: reqDoc.from } });
         await FriendRequest.findByIdAndDelete(requestId);
+
+        const accepterId = reqDoc.to.toString(); // Người chấp nhận (chính mình)
+        const requesterId = reqDoc.from.toString(); // Người gửi lời mời
+        const io = req.app.get('io');
+        
+        if (io) {
+            // 1. Gửi cho người chấp nhận (Me): Cập nhật list chat/friend
+            io.to(accepterId).emit('friendStatusUpdate', { 
+                action: 'accepted', 
+                partnerId: requesterId 
+            });
+            // 2. Gửi cho người gửi lời mời: Cập nhật list chat/friend
+            io.to(requesterId).emit('friendStatusUpdate', { 
+                action: 'accepted', 
+                partnerId: accepterId 
+            });
+            console.log(`[Socket] Accepted: Emitted friendStatusUpdate to ${accepterId} & ${requesterId}`);
+        }
+
         res.json({ success: true, message: 'Đã kết bạn' });
       } else {
         await FriendRequest.findByIdAndDelete(requestId);
@@ -229,7 +251,45 @@ const friendController = {
       console.error('Remove Friend Error:', err);
       res.status(500).json({ error: 'Lỗi server' });
     }
-  }
+  },
+
+
+// 7 Xóa đoạn chat
+  deleteConversation: async (req, res) => {
+      try {
+        const { chatId } = req.body;
+        const userId = req.session.user._id; // Lấy ID người dùng từ session
+
+        if (!chatId) {
+          return res.status(400).json({ error: "Thiếu Chat ID" });
+        }
+
+        // 1. Tìm đoạn chat
+        const chat = await Chat.findById(chatId);
+        if (!chat) {
+          return res.status(404).json({ error: "Cuộc trò chuyện không tồn tại" });
+        }
+
+        // 2. Kiểm tra quyền (User phải là thành viên của chat đó mới được xóa)
+        // Lưu ý: member trong DB là ObjectId, cần so sánh dạng chuỗi hoặc dùng .includes()
+        const isMember = chat.members.some(m => m.toString() === userId.toString());
+        
+        if (!isMember) {
+          return res.status(403).json({ error: "Bạn không có quyền xóa cuộc trò chuyện này" });
+        }
+
+        // 3. Xóa toàn bộ tin nhắn của chat này
+        await Message.deleteMany({ chat: chatId });
+
+        // 4. Xóa Chat Room
+        await Chat.findByIdAndDelete(chatId);
+
+        res.json({ success: true });
+      } catch (err) {
+        console.error("Delete Chat Error:", err);
+        res.status(500).json({ error: "Lỗi server khi xóa trò chuyện" });
+      }
+    },
 };
 
 module.exports = friendController;

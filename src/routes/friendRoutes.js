@@ -23,4 +23,7 @@ router.post('/requests/respond', ensureLoggedInJSON, friendController.respondReq
 // 6. Hủy kết bạn
 router.post('/remove', ensureLoggedInJSON, friendController.removeFriend);
 
+// 7. Xóa đoạn chat
+router.post('/delete', ensureLoggedInJSON, friendController.deleteConversation);
+
 module.exports = router;

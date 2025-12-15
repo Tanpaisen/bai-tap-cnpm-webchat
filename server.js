@@ -85,7 +85,7 @@ io.on('connection', async (socket) => { // Thêm async để xử lý DB an toà
         }
         // Gửi cho tất cả trong phòng TRỪ người gửi (socket.to)
         // Hoặc gửi cho tất cả bao gồm người gửi (io.in) tùy logic FE
-        socket.to(fullMsg.roomId).emit('newMessage', fullMsg);
+        io.in(fullMsg.roomId).emit('newMessage', fullMsg);
     });
 
     socket.on('disconnect', async () => {
