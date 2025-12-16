@@ -32,4 +32,10 @@ router.get('/auth/google/callback',
     authController.googleCallback
 );
 
+// Route hiển thị trang nhập OTP
+router.get('/verify-otp', authController.getOtpPage);
+
+// API xử lý OTP (POST từ form)
+router.post('/api/auth/verify-otp', authController.verifyOtp);
+
 module.exports = router;

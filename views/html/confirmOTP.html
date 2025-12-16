@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xác thực bảo mật - Evelyn Chat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #4F46E5; /* Màu tím xanh hiện đại */
+            --primary-hover: #4338ca;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --text-color: #1f2937;
+            --text-secondary: #6b7280;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-gradient);
+            overflow: hidden;
+        }
+
+        /* Hiệu ứng nền mờ (Glassmorphism) */
+        .otp-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Icon ổ khóa */
+        .icon-lock {
+            width: 60px;
+            height: 60px;
+            background: #e0e7ff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            color: var(--primary-color);
+            font-size: 1.5rem;
+        }
+
+        h2 {
+            color: var(--text-color);
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+            line-height: 1.5;
+        }
+
+        /* Khu vực nhập 6 số */
+        .otp-inputs {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .otp-inputs input {
+            width: 100%;
+            height: 50px;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 600;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            background: #f9fafb;
+            transition: all 0.3s ease;
+            color: var(--text-color);
+        }
+
+        /* Hiệu ứng khi focus */
+        .otp-inputs input:focus {
+            border-color: var(--primary-color);
+            background: #fff;
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .btn-verify {
+            width: 100%;
+            padding: 0.875rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-verify:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-verify:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .resend-text {
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .resend-link {
+            color: var(--primary-color);
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .resend-link:hover {
+            text-decoration: underline;
+        }
+
+        #message {
+            min-height: 20px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .error-msg { color: #dc2626; }
+        .success-msg { color: #059669; }
+
+    </style>
+</head>
+<body>
+
+    <div class="otp-container">
+        <div class="icon-lock">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+        </div>
+
+        <h2>Xác thực tài khoản</h2>
+        <p class="subtitle">Chúng tôi đã gửi mã xác nhận 6 số đến email của bạn. Vui lòng kiểm tra hộp thư.</p>
+
+        <div id="message"></div>
+
+        <form id="otpForm">
+            <div class="otp-inputs" id="inputs">
+                <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+                <input type="text" maxlength="1" pattern="[0-9]" inputmode="numeric" required>
+            </div>
+
+            <button type="submit" class="btn-verify" id="verifyBtn">Xác nhận</button>
+        </form>
+
+        <p class="resend-text">
+            Chưa nhận được mã? 
+            <a href="#" class="resend-link" onclick="alert('Tính năng gửi lại đang phát triển')">Gửi lại</a>
+        </p>
+    </div>
+
+    <script>
+        const inputs = document.querySelectorAll('.otp-inputs input');
+        const verifyBtn = document.getElementById('verifyBtn');
+        const form = document.getElementById('otpForm');
+        const messageDiv = document.getElementById('message');
+
+        // 1. Xử lý logic nhập liệu cho 6 ô
+        inputs.forEach((input, index) => {
+            // Chỉ cho nhập số
+            input.addEventListener('input', (e) => {
+                const val = e.target.value;
+
+                if (isNaN(val)) {
+                    e.target.value = "";
+                    return;
+                }
+
+                if (val !== "") {
+                    // 💡 FIX LỖI: Nếu ô đã có số mà nhập tiếp -> Lấy số mới nhất (số cuối cùng)
+                    if (val.length > 1) {
+                        val = val.slice(-1); 
+                        e.target.value = val;
+                    }
+                    
+                    // 💡 FIX LỖI: Chờ 10ms để trình duyệt xử lý xong sự kiện phím rồi mới nhảy
+                    if (index < inputs.length - 1) {
+                        setTimeout(() => {
+                            inputs[index + 1].focus();
+                        }, 10);
+                    }
+                }
+            });
+
+            // Xử lý nút Backspace (Xóa lùi)
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && e.target.value === "") {
+                    if (index > 0) {
+                        inputs[index - 1].focus();
+                    }
+                }
+            });
+
+            // Xử lý Paste (Dán cả chuỗi 6 số)
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pasteData = e.clipboardData.getData('text');
+                const otpArray = pasteData.split('').filter(char => !isNaN(char)); // Lọc lấy số
+
+                if (otpArray.length > 0) {
+                    inputs.forEach((inp, i) => {
+                        if (otpArray[i]) {
+                            inp.value = otpArray[i];
+                        }
+                    });
+                    // Focus vào ô cuối cùng hoặc ô tiếp theo cần nhập
+                    const focusIndex = Math.min(otpArray.length, inputs.length - 1);
+                    inputs[focusIndex].focus();
+                }
+            });
+        });
+
+        // Focus ô đầu tiên khi tải trang
+        inputs[0].focus();
+
+        // 2. Xử lý Submit
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            messageDiv.textContent = "";
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = "Đang kiểm tra...";
+
+            // Gom giá trị từ 6 ô thành 1 chuỗi
+            let otpCode = "";
+            inputs.forEach(input => otpCode += input.value);
+
+            if (otpCode.length < 6) {
+                showMessage("Vui lòng nhập đủ 6 số.", "error-msg");
+                resetButton();
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ otp: otpCode })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    showMessage("Xác thực thành công! Đang chuyển hướng...", "success-msg");
+                    setTimeout(() => {
+                        window.location.href = data.redirect;
+                    }, 1000);
+                } else {
+                    showMessage(data.error || "Mã OTP không đúng.", "error-msg");
+                    resetButton();
+                }
+            } catch (err) {
+                console.error(err);
+                showMessage("Lỗi kết nối server.", "error-msg");
+                resetButton();
+            }
+        });
+
+        function showMessage(text, className) {
+            messageDiv.textContent = text;
+            messageDiv.className = className;
+        }
+
+        function resetButton() {
+            verifyBtn.disabled = false;
+            verifyBtn.textContent = "Xác nhận";
+        }
+    </script>
+</body>
+</html>

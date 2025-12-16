@@ -7,6 +7,8 @@ const userSchema = new mongoose.Schema({
     username: { type: String, unique: true, required: true, index:true, minlength: 6, maxlength: 50},
     password: { type: String,}, //required: true, minlength: 6, maxlength: 75 },
     googleId: { type: String, unique: true, sparse: true },
+    otp: { type: String }, 
+    otpExpires: { type: Date },
 
     nickname: { type: String, minlength: 1, maxlength: 50 },
     avatar: { type: String, default: 'https://i.pinimg.com/originals/8d/a5/c3/8da5c3a06407303694d6381b23368f02.png' },

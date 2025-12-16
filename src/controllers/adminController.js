@@ -3,7 +3,7 @@
 const User = require('../models/User');
 const SystemConfig = require('../models/SystemConfig');
 const AdminLog = require('../models/AdminLog');
-const Message = require('../models/Message'); // GIẢ ĐỊNH Model Message tồn tại
+const Message = require('../models/Message'); 
 const AccessLog = require('../models/AccessLog');
 const socketManager = require('../socket/socketManager');
 
