@@ -175,8 +175,10 @@ app.get('/', (req, res) => {
     if (!req.session.user) {
         return res.redirect('/login');
     }
+
+    const adminRoles = ['admin', 'superadmin', 'super_admin']; 
     // Nếu là admin -> vào dashboard
-    if (['admin', 'superadmin'].includes(req.session.user.role)) {
+    if (adminRoles.includes(req.session.user.role)) {
         return res.redirect('/admin');
     }
     // User thường -> vào chat

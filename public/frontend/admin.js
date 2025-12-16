@@ -710,26 +710,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function initAdminSession() {
         try {
-            const response = await fetch('/api/admin/me'); // 🔹 Endpoint trả về user đang đăng nhập
+            // 1. Đổi đường dẫn thành /api/me (API này đã có trong app.js)
+            const response = await fetch('/api/me');
             const data = await response.json();
 
-            if (!response.ok || !data.success) {
-                alert('Bạn chưa đăng nhập hoặc không có quyền truy cập trang quản trị.');
+            // 2. logic kiểm tra (API /api/me trả về thẳng object user hoặc lỗi)
+            if (!response.ok || data.error) {
+                alert('Bạn chưa đăng nhập hoặc không có quyền truy cập.');
                 window.location.href = '/login';
                 return;
             }
 
-            // Gán thông tin vào biến toàn cục
-            currentAdminId = data.user._id;
-            currentAdminRole = data.user.role;
+            // 3. cách lấy dữ liệu (data chính là user, không cần data.user)
+            currentAdminId = data._id;     // Sửa data.user._id thành data._id
+            currentAdminRole = data.role;  // Sửa data.user.role thành data.role
 
-            // Gán vào window để các hàm khác dùng được
             window.currentAdminId = currentAdminId;
             window.currentAdminRole = currentAdminRole;
 
             console.log('✅ Đăng nhập với vai trò:', currentAdminRole);
-
-            // Khởi tạo UI sau khi xác thực thành công
             setupTabSwitching();
 
         } catch (error) {

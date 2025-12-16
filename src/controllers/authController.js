@@ -1,11 +1,9 @@
-// src/controllers/authController.js
 const path = require('path');
 const User = require('../models/User');
 
 module.exports = {
     // --- GET: Hiển thị trang Login/Register ---
     getAuthPage: (req, res) => {
-        // Trỏ đúng về file html trong views
         res.sendFile(path.join(__dirname, '../../views/html/login.html'));
     },
 
@@ -17,6 +15,11 @@ module.exports = {
     // --- POST: Xử lý Đăng ký ---
     register: async (req, res) => {
         const { username, password, confirmPassword } = req.body;
+        //Mật khẩu k đc để trống
+        if (!password || password.trim().length === 0) {
+            req.session.errorMessage = 'Mật khẩu không được để trống.';
+            return res.redirect('/register');
+        }
         
         if (password !== confirmPassword) {
             req.session.errorMessage = 'Mật khẩu xác nhận không khớp.';
@@ -29,7 +32,6 @@ module.exports = {
             req.session.errorMessage = 'Đăng ký thành công! Hãy đăng nhập.';
             return res.redirect('/login');
         } catch (err) {
-            // Xử lý lỗi đơn giản cho khung sườn
             console.error(err);
             req.session.errorMessage = 'Lỗi đăng ký (Trùng tên hoặc lỗi DB).';
             return res.redirect('/register');
@@ -41,8 +43,13 @@ module.exports = {
         const { username, password } = req.body;
         try {
             const user = await User.findOne({ username });
+
+            //Mật khẩu k đc để trống
+            if (!password || password.trim().length === 0) {
+            req.session.errorMessage = 'Mật khẩu không được để trống.';
+            return res.redirect('/register');
+        }
             
-            // Logic check pass đơn giản (Nhóm 1 sẽ hoàn thiện thêm)
             if (!user || !(await user.comparePassword(password))) {
                 req.session.errorMessage = 'Sai tài khoản hoặc mật khẩu.';
                 return res.redirect('/login');
@@ -57,7 +64,13 @@ module.exports = {
                 role: user.role || 'user'
             };
 
-            return res.redirect('/chat');
+            // Kiểm tra quyền để điều hướng đúng trang
+            const adminRoles = ['admin', 'superadmin'];
+            if (adminRoles.includes(user.role)) {
+                return res.redirect('/admin'); // Chuyển đến trang Dashboard
+            }
+
+            return res.redirect('/chat'); // User thường về trang Chat
         } catch (err) {
             console.error(err);
             req.session.errorMessage = 'Lỗi server.';
@@ -73,17 +86,16 @@ module.exports = {
         });
     },
 
-    // --- API: Lấy thông báo lỗi (Cho Frontend JS gọi) ---
+    // --- API: Lấy thông báo lỗi ---
     getAuthMessage: (req, res) => {
         const error = req.session.errorMessage;
         delete req.session.errorMessage;
         res.json({ error });
     },
 
-    // --- CALLBACK: Xử lý sau khi Google Login thành công ---
+    // --- CALLBACK: Google Login ---
     googleCallback: (req, res) => {
         const user = req.user;
-        // Tạo session từ user passport
         req.session.user = {
             _id: user._id.toString(),
             username: user.username,
@@ -95,6 +107,13 @@ module.exports = {
         if (!user.nickname || user.nickname === "New User") {
             return res.redirect('/setup-nickname');
         }
+
+        //  Kiểm tra quyền Admin cho Google Login
+        const adminRoles = ['admin', 'superadmin', 'super_admin'];
+        if (adminRoles.includes(user.role)) {
+            return res.redirect('/admin');
+        }
+
         res.redirect('/chat');
     }
 };
