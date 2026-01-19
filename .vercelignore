@@ -1,0 +1,21 @@
+# Bỏ qua thư viện (Vercel sẽ tự cài lại)
+node_modules
+package-lock.json
+yarn.lock
+
+# Bỏ qua các file git
+.git
+.gitignore
+
+# Bỏ qua file môi trường và log
+.env
+npm-debug.log
+error.log
+
+# Bỏ qua các file media nặng (nếu có)
+*.mp4
+*.mov
+*.zip
+*.rar
+*.psd
+*.fig
