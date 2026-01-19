@@ -11,8 +11,8 @@ const server = http.createServer(app);
 // ⚙️ Cấu hình CORS linh hoạt hơn
 const allowedOrigins = [
     'http://localhost:3000',
-    process.env.DEVTUNNEL_URL // Nên để trong .env
-].filter(Boolean); // Loại bỏ giá trị undefined nếu không có env
+    process.env.DEVTUNNEL_URL 
+].filter(Boolean);
 
 const io = socketManager.init(server, { 
     cors: {

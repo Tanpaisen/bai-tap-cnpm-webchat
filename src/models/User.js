@@ -74,10 +74,10 @@ userSchema.set('toJSON', {
     transform: (doc, ret) => {
         delete ret.password;
         // 💡 Giữ lại isBanned để client biết tài khoản bị khóa
-        // delete ret.banReason; 
-        // delete ret.bannedBy; 
-        // delete ret.bannedAt; 
-        // delete ret.banExpires; 
+        delete ret.banReason; 
+        delete ret.bannedBy; 
+        delete ret.bannedAt; 
+        delete ret.banExpires; 
         return ret;
     }
 });
